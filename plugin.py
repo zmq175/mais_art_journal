@@ -19,7 +19,7 @@ from .core.config_manager import EnhancedConfigManager
 
 @register_plugin
 class MaisArtJournalPlugin(BasePlugin):
-    """麦麦绘卷 - 智能多模型图片生成插件，支持文生图和图生图"""
+    """麦麦绘卷（Claude MAInet）- 智能多模型图片生成插件，支持文生图和图生图"""
 
     # 插件基本信息
     plugin_name = "mais_art_journal"
@@ -152,7 +152,7 @@ class MaisArtJournalPlugin(BasePlugin):
             "name": ConfigField(
                 type=str,
                 default="麦麦绘卷",
-                description="Mai's Art Journal — 智能多模型图片生成插件，支持文生图/图生图自动识别",
+                description="麦麦绘卷（Claude MAInet）— 智能多模型图片生成插件，支持文生图/图生图自动识别",
                 label="插件名称",
                 required=True,
                 disabled=True,

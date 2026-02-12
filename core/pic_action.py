@@ -254,10 +254,20 @@ class MaisArtAction(BaseAction):
         # 配置验证
         http_base_url = model_config.get("base_url")
         http_api_key = model_config.get("api_key")
-        if not (http_base_url and http_api_key):
-            error_msg = "抱歉，图片生成功能所需的HTTP配置（如API地址或密钥）不完整，无法提供服务。"
+        api_format = model_config.get("format", "openai")
+        
+        # 检查base_url
+        if not http_base_url:
+            error_msg = "抱歉，图片生成功能所需的HTTP配置（如API地址）不完整，无法提供服务。"
             await self.send_text(error_msg)
-            logger.error(f"{self.log_prefix} HTTP调用配置缺失: base_url 或 api_key.")
+            logger.error(f"{self.log_prefix} HTTP调用配置缺失: base_url.")
+            return False, "HTTP配置不完整"
+        
+        # 检查api_key（comfyui格式允许为空）
+        if api_format != "comfyui" and not http_api_key:
+            error_msg = "抱歉，图片生成功能所需的HTTP配置（如API密钥）不完整，无法提供服务。"
+            await self.send_text(error_msg)
+            logger.error(f"{self.log_prefix} HTTP调用配置缺失: api_key.")
             return False, "HTTP配置不完整"
 
         # API密钥验证
@@ -612,12 +622,19 @@ class MaisArtAction(BaseAction):
         # 配置验证
         http_base_url = model_config.get("base_url")
         http_api_key = model_config.get("api_key")
-        if not (http_base_url and http_api_key):
-            return False, "HTTP配置不完整"
-        if "YOUR_API_KEY_HERE" in http_api_key or "xxxxxxxxxxxxxx" in http_api_key:
-            return False, "API密钥未配置"
-
         api_format = model_config.get("format", "openai")
+        
+        # 检查base_url
+        if not http_base_url:
+            return False, "HTTP配置不完整"
+        
+        # 检查api_key（comfyui格式允许为空）
+        if api_format != "comfyui" and not http_api_key:
+            return False, "HTTP配置不完整"
+        
+        # API密钥验证（仅对需要api_key的格式）
+        if api_format != "comfyui" and ("YOUR_API_KEY_HERE" in http_api_key or "xxxxxxxxxxxxxx" in http_api_key):
+            return False, "API密钥未配置"
 
         # 合并额外负面提示词
         if extra_negative_prompt:

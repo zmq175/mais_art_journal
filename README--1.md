@@ -1,4 +1,4 @@
-# 麦麦绘卷 (Mai's Art Journal)
+# 麦麦绘卷（Claude MAInet）
 
 MaiBot 多模型图片生成插件，支持 9 种 API 格式、文生图/图生图自动识别、自拍模式、自动自拍发说说。
 

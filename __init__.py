@@ -1,5 +1,5 @@
 """
-麦麦绘卷 (Mai's Art Journal)
+麦麦绘卷（Claude MAInet）
 智能多模型图片生成插件，支持文生图和图生图
 """
 
