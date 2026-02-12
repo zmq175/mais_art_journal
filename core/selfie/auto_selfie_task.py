@@ -32,6 +32,9 @@ logger = get_logger("auto_selfie.task")
 class AutoSelfieTask:
     """自动自拍后台定时任务"""
 
+    # 连续失败达到此次数后，等待时间翻倍
+    _MAX_CONSECUTIVE_FAILURES = 3
+
     def __init__(self, plugin):
         """
         Args:
@@ -40,6 +43,7 @@ class AutoSelfieTask:
         self.plugin = plugin
         self.is_running = False
         self.task: Optional[asyncio.Task] = None
+        self._consecutive_failures = 0
 
     def get_config(self, key: str, default=None):
         return self.plugin.get_config(key, default)
@@ -85,13 +89,25 @@ class AutoSelfieTask:
                     logger.debug("当前在安静时段，跳过自拍")
                 else:
                     await self._execute_selfie()
+                    self._consecutive_failures = 0
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"自拍任务执行出错: {e}")
+                self._consecutive_failures += 1
+                logger.error(
+                    f"自拍任务执行出错 (连续第{self._consecutive_failures}次): {e}"
+                )
 
-            # 等待到下一次
-            await asyncio.sleep(interval_seconds)
+            # 连续失败时指数退避：正常间隔 × 2^(failures // MAX)
+            backoff_multiplier = 2 ** (
+                self._consecutive_failures // self._MAX_CONSECUTIVE_FAILURES
+            )
+            sleep_seconds = interval_seconds * backoff_multiplier
+            if backoff_multiplier > 1:
+                logger.warning(
+                    f"连续失败{self._consecutive_failures}次，下次自拍间隔延长至 {sleep_seconds // 60} 分钟"
+                )
+            await asyncio.sleep(sleep_seconds)
 
     async def _execute_selfie(self):
         """执行一次完整的自拍流程"""
@@ -128,11 +144,21 @@ class AutoSelfieTask:
             logger.error(f"模型配置获取失败: {selfie_model}")
             return
 
+        # 透传代理配置
+        extra_config = {}
+        if self.get_config("proxy.enabled", False):
+            extra_config["proxy"] = {
+                "enabled": True,
+                "url": self.get_config("proxy.url", "http://127.0.0.1:7890"),
+                "timeout": self.get_config("proxy.timeout", 60),
+            }
+
         success, image_data = await generate_image_standalone(
             prompt=prompt,
             model_config=model_config,
             negative_prompt=negative_prompt,
             max_retries=2,
+            extra_config=extra_config if extra_config else None,
         )
 
         if not success:

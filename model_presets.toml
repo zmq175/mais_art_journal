@@ -10,21 +10,20 @@
 # 模型1：Qwen-Image 通义万象文生图
 # 高质量通用文生图模型，1584x1056 最佳
 # ============================================================
-[presets.qwen_image]
+[models.qwen_image]
 name = "通义万象 Qwen-Image"
 base_url = "https://api-inference.modelscope.cn/v1"
 api_key = "Bearer YOUR_MODELSCOPE_TOKEN"
 format = "modelscope"
 model = "Qwen/Qwen-Image"
 fixed_size_enabled = true
-default_size = "1584x1056"
+default_size = "1024x1536"
 seed = -1
 guidance_scale = 2.5
 num_inference_steps = 20
 watermark = false
-custom_prompt_add = ","
+custom_prompt_add = ", "
 negative_prompt_add = ""
-artist = ""
 support_img2img = false
 auto_recall_delay = 0
 
@@ -32,21 +31,20 @@ auto_recall_delay = 0
 # 模型2：FLUX.1-schnell 快速生图
 # 速度快，质量好，适合日常使用
 # ============================================================
-[presets.flux_schnell]
+[models.flux_schnell]
 name = "FLUX.1-schnell 快速"
 base_url = "https://api-inference.modelscope.cn/v1"
 api_key = "Bearer YOUR_MODELSCOPE_TOKEN"
 format = "openai"
 model = "black-forest-labs/FLUX.1-schnell"
-fixed_size_enabled = false
-default_size = "1024x1024"
+fixed_size_enabled = true
+default_size = "1024x1536"
 seed = -1
-guidance_scale = 3.5
-num_inference_steps = 4
+guidance_scale = 2.5
+num_inference_steps = 20
 watermark = false
-custom_prompt_add = ","
+custom_prompt_add = ", "
 negative_prompt_add = ""
-artist = ""
 support_img2img = false
 auto_recall_delay = 0
 
@@ -54,21 +52,20 @@ auto_recall_delay = 0
 # 模型3：Kolors 可图
 # 快手可图模型，擅长中文理解
 # ============================================================
-[presets.kolors]
+[models.kolors]
 name = "可图 Kolors"
 base_url = "https://api-inference.modelscope.cn/v1"
 api_key = "Bearer YOUR_MODELSCOPE_TOKEN"
 format = "openai"
 model = "Kwai-Kolors/Kolors"
-fixed_size_enabled = false
-default_size = "1024x1024"
+fixed_size_enabled = true
+default_size = "1024x1536"
 seed = -1
-guidance_scale = 5.0
-num_inference_steps = 25
+guidance_scale = 2.5
+num_inference_steps = 20
 watermark = false
-custom_prompt_add = ","
-negative_prompt_add = "lowres, bad anatomy, bad hands, text, error"
-artist = ""
+custom_prompt_add = ", "
+negative_prompt_add = ""
 support_img2img = false
 auto_recall_delay = 0
 
@@ -76,21 +73,20 @@ auto_recall_delay = 0
 # 模型4：Stable Diffusion 3.5 Large
 # 高质量文生图，出图慢但效果好
 # ============================================================
-[presets.sd35_large]
+[models.sd35_large]
 name = "SD 3.5 Large"
 base_url = "https://api-inference.modelscope.cn/v1"
 api_key = "Bearer YOUR_MODELSCOPE_TOKEN"
 format = "openai"
 model = "stabilityai/stable-diffusion-3.5-large"
-fixed_size_enabled = false
-default_size = "1024x1024"
+fixed_size_enabled = true
+default_size = "1024x1536"
 seed = -1
-guidance_scale = 4.5
-num_inference_steps = 28
+guidance_scale = 2.5
+num_inference_steps = 20
 watermark = false
-custom_prompt_add = ","
-negative_prompt_add = "lowres, bad anatomy, bad hands, text, error"
-artist = ""
+custom_prompt_add = ", "
+negative_prompt_add = ""
 support_img2img = false
 auto_recall_delay = 0
 
@@ -98,64 +94,61 @@ auto_recall_delay = 0
 # 模型5：潦草风格模型
 # 北欧绘本风格，适合插画场景
 # ============================================================
-[presets.liaocao]
+[models.liaocao]
 name = "潦草绘本风"
 base_url = "https://api-inference.modelscope.cn/v1"
 api_key = "Bearer YOUR_MODELSCOPE_TOKEN"
 format = "openai"
 model = "cancel13/liaocao"
-fixed_size_enabled = false
-default_size = "1024x1024"
-seed = 42
+fixed_size_enabled = true
+default_size = "1024x1536"
+seed = -1
 guidance_scale = 2.5
 num_inference_steps = 20
 watermark = false
-custom_prompt_add = ", Nordic picture book art style, minimalist flat design, liaocao"
-negative_prompt_add = "Pornography,nudity,lowres, bad anatomy, bad hands, text, error"
-artist = ""
-support_img2img = true
+custom_prompt_add = ", "
+negative_prompt_add = ""
+support_img2img = false
 auto_recall_delay = 0
 
 # ============================================================
 # 模型6：Qwen-Image-Edit 图片编辑
 # 通义万象图片编辑模型，支持图生图
 # ============================================================
-[presets.qwen_image_edit]
+[models.qwen_image_edit]
 name = "通义万象图片编辑"
 base_url = "https://api-inference.modelscope.cn/v1"
 api_key = "Bearer YOUR_MODELSCOPE_TOKEN"
 format = "modelscope"
 model = "Qwen/Qwen-Image-Edit-2509"
 fixed_size_enabled = true
-default_size = "1584x1056"
+default_size = "1024x1536"
 seed = -1
 guidance_scale = 2.5
 num_inference_steps = 20
 watermark = false
-custom_prompt_add = ","
+custom_prompt_add = ", "
 negative_prompt_add = ""
-artist = ""
-support_img2img = true
+support_img2img = false
 auto_recall_delay = 0
 
 # ============================================================
 # 模型7：SDXL 1.0
 # 经典 Stable Diffusion XL 模型
 # ============================================================
-[presets.sdxl]
+[models.sdxl]
 name = "SDXL 1.0"
 base_url = "https://api-inference.modelscope.cn/v1"
 api_key = "Bearer YOUR_MODELSCOPE_TOKEN"
 format = "openai"
 model = "stabilityai/stable-diffusion-xl-base-1.0"
-fixed_size_enabled = false
-default_size = "1024x1024"
+fixed_size_enabled = true
+default_size = "1024x1536"
 seed = -1
-guidance_scale = 7.5
-num_inference_steps = 30
+guidance_scale = 2.5
+num_inference_steps = 20
 watermark = false
-custom_prompt_add = ","
-negative_prompt_add = "lowres, bad anatomy, bad hands, text, error, worst quality, low quality"
-artist = ""
+custom_prompt_add = ", "
+negative_prompt_add = ""
 support_img2img = false
 auto_recall_delay = 0

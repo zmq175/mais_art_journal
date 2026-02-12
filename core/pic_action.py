@@ -2,7 +2,8 @@ import asyncio
 import traceback
 import base64
 import os
-from typing import List, Tuple, Type, Optional, Dict, Any
+import time as time_module
+from typing import Tuple, Optional, Dict, Any
 
 from src.plugin_system.base.base_action import BaseAction
 from src.plugin_system.base.component_types import ActionActivationType, ChatMode
@@ -348,13 +349,14 @@ class MaisArtAction(BaseAction):
                     final_image_data, self._download_and_encode_base64, self.log_prefix
                 )
                 if resolved_ok:
+                    send_timestamp = time_module.time()
                     send_success = await self.send_image(resolved_data)
                     if send_success:
                         mode_text = "图生图" if is_img2img else "文生图"
                         if enable_debug:
                             await self.send_text(f"{mode_text}完成！")
                         self.cache_manager.cache_result(description, model_name, image_size, strength, is_img2img, resolved_data)
-                        await self._schedule_auto_recall_for_recent_message(model_config)
+                        await self._schedule_auto_recall_for_recent_message(model_config, send_timestamp)
                         return True, f"{mode_text}已成功生成并发送"
                     else:
                         await self.send_text("图片已处理完成，但发送失败了")
@@ -561,7 +563,7 @@ class MaisArtAction(BaseAction):
             logger.error(f"{self.log_prefix} 加载自拍参考图片失败: {e}")
             return None
 
-    async def _schedule_auto_recall_for_recent_message(self, model_config: Dict[str, Any] = None):
+    async def _schedule_auto_recall_for_recent_message(self, model_config: Dict[str, Any] = None, send_timestamp: float = 0.0):
         """安排最近发送消息的自动撤回"""
         global_enabled = self.get_config("auto_recall.enabled", False)
         if not global_enabled or not model_config:
@@ -583,7 +585,7 @@ class MaisArtAction(BaseAction):
             logger.info(f"{self.log_prefix} 模型 {model_id} 撤回已在当前聊天流禁用")
             return
 
-        await schedule_auto_recall(self.chat_id, delay_seconds, self.log_prefix, self.send_command)
+        await schedule_auto_recall(self.chat_id, delay_seconds, self.log_prefix, self.send_command, send_timestamp)
 
     async def _generate_image_only(
         self,

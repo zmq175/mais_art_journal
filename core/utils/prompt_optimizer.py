@@ -170,6 +170,8 @@ def get_optimizer(log_prefix: str = "[PromptOptimizer]") -> PromptOptimizer:
     global _optimizer_instance
     if _optimizer_instance is None:
         _optimizer_instance = PromptOptimizer(log_prefix)
+    else:
+        _optimizer_instance.log_prefix = log_prefix
     return _optimizer_instance
 
 

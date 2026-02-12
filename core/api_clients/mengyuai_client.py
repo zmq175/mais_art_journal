@@ -29,7 +29,7 @@ class MengyuaiClient(BaseApiClient):
         try:
             # API配置
             base_url = model_config.get("base_url", "https://sd.exacg.cc").rstrip('/')
-            api_key = model_config.get("api_key", "")
+            api_key = model_config.get("api_key", "").replace("Bearer ", "")
 
             if not api_key or api_key in ["YOUR_API_KEY", "xxxxxx"]:
                 logger.error(f"{self.log_prefix} (梦羽AI) API密钥未配置")

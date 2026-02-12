@@ -1,22 +1,18 @@
-# 麦麦绘卷（Claude MAInet）
+# 麦麦绘卷 (Claude MAInet) - 智能多模型图片生成插件
 
-MaiBot 多模型图片生成插件，支持 9 种 API 格式、文生图/图生图自动识别、自拍模式、自动自拍发说说。
+基于 Maibot 插件的智能多模型图片生成插件，支持文生图和图生图自动识别。兼容OpenAI、豆包、Gemini、魔搭等多种API格式。提供命令式风格转换、自拍模式、自动自拍发说说、模型配置管理、结果缓存等功能。
 
-## 功能
+## ✨ 主要特性
 
-### 智能图片生成 (Action 组件)
-
-由 MaiBot LLM 自动触发，不需要手动命令。
-
+### 🎯 智能图片生成
 - **文生图**: 根据对话内容自动生成图片
 - **图生图**: 检测到消息中有图片时自动使用图生图模式
 - **自拍模式**: 根据手部动作库生成自拍提示词，可配置参考图
 - **提示词优化**: 自动将中文描述优化为专业英文 SD 提示词（自拍模式仅优化场景，不干扰角色外观）
-- **LLM 智能选尺寸**: 根据内容自动选择竖图/横图/方图
 - **结果缓存**: 相同参数复用之前的结果
 - **自动撤回**: 可按模型配置延时撤回
 
-### /dr 命令系统 (Command 组件)
+### 🎨/dr 命令系统
 
 #### 图片生成
 
@@ -57,8 +53,6 @@ MaiBot 多模型图片生成插件，支持 9 种 API 格式、文生图/图生�
 - `autonomous_planning` 插件 — 提供日程数据（当前活动）
 - `Maizone` 插件 — 发布到 QQ 空间
 
-**流程**: 获取当前活动 → 生成场景提示词 → 调用生图 API → LLM 生成配文 → 发布说说
-
 **特性**:
 - 可配置间隔（默认 2 小时）
 - 安静时段控制（默认 00:00-07:00 不发）
@@ -83,6 +77,24 @@ MaiBot 多模型图片生成插件，支持 9 种 API 格式、文生图/图生�
 | `comfyui` | 本地 ComfyUI | 加载工作流 JSON，替换占位符，轮询结果（支持代理配置） |
 
 ---
+
+## 🚀 快速开始
+
+## 安装插件
+  - 使用命令行工具或是 git base 进入你的麦麦目录
+
+   ```shell
+   cd MaiBot/plugins
+   ```
+
+  - 克隆本仓库
+
+   ```shell
+   git clone https://github.com/Rabbit-Jia-Er/mais-art-journal.git mais_art_journal
+   ```
+
+  - 重启 maibot 后你会看到在当前插件文件夹 `MaiBot/plugins/mais_art_journal`中生成了一个配置文件 `config.toml`
+  - 按照配置文件中的说明填写必要参数后重启 MaiBot 即可让你的麦麦学会不同画风的画画（如何申请 key 请自行前往对应平台官网查看 api 文档）
 
 ## 配置说明
 
@@ -125,99 +137,93 @@ guidance_scale = 2.5                       # 引导强度
 num_inference_steps = 20                   # 推理步数
 custom_prompt_add = ", best quality"       # 追加正面提示词
 negative_prompt_add = "lowres, bad anatomy" # 追加负面提示词
-support_img2img = true                     # 是否支持图生图（mengyuai 格式必须设为 false）
+support_img2img = true                     # 是否支持图生图（请自行判断）
 auto_recall_delay = 0                      # 自动撤回延时（秒），0=不撤回
 ```
 
 添加更多模型：复制 `[models.model1]` 整节，改名为 `model2`、`model3` 等。
 
-#### 各平台配置要点
+### ComfyUI 支持
 
-**硅基流动**:
+通过本地或远程 ComfyUI 实例的 HTTP API 生成图片。需先在 ComfyUI Web UI 中点击 **"保存(API格式)"** 导出工作流 JSON，放到插件 `workflow/` 目录下。
+
+**基本配置：**
 ```toml
-format = "openai"
-base_url = "https://api.siliconflow.cn/v1"
-# 插件自动适配 image_size/batch_size 等参数差异
+[models.model6]
+name = "ComfyUI-本地"
+base_url = "http://127.0.0.1:8188"  # ComfyUI 服务地址
+api_key = ""                         # 不需要，留空
+format = "comfyui"                   # 必须填 comfyui
+model = "my_workflow.json"           # 工作流文件名（相对 workflow/ 目录，也可填绝对路径）
+fixed_size_enabled = true            # 建议开启，尺寸通过占位符传入工作流
+default_size = "1024x1024"           # 通过 ${width}/${height} 传入工作流
+seed = -1                            # -1=每次随机，通过 ${seed} 传入
+guidance_scale = 8                   # 通过 ${cfg} 传入
+num_inference_steps = 30             # 通过 ${steps} 传入
+custom_prompt_add = ", masterpiece"  # 拼接到用户提示词末尾，一起通过 ${prompt} 传入
+negative_prompt_add = "lowres"       # 通过 ${negative_prompt} 传入
+support_img2img = false              # 需工作流中包含 ${image} 占位符
 ```
 
-**豆包（火山引擎）**:
-```toml
-format = "doubao"
-base_url = "https://ark.cn-beijing.volces.com/api/v3"
-api_key = "Bearer xxx"       # 会自动去除 Bearer 前缀传给 SDK
-fixed_size_enabled = true    # 必须开启，豆包不接受像素格式
-default_size = "2K"          # seedream: "2K"，seededit: "adaptive"
-guidance_scale = 5.5         # seededit 推荐
-watermark = false
+**工作流占位符：**
+
+在导出的 API 格式 JSON 中，将需要动态控制的字段值替换为占位符（带引号）：
+
+| 占位符 | 来源 | 工作流中的典型位置 |
+|--------|------|---------------------|
+| `"${prompt}"` | 用户提示词 + `custom_prompt_add` | CLIPTextEncode 节点的 `text` |
+| `"${seed}"` | `seed` 配置值 | KSampler 节点的 `seed` |
+| `"${negative_prompt}"` | `negative_prompt_add` | 负面 CLIPTextEncode 节点的 `text` |
+| `"${steps}"` | `num_inference_steps` | KSampler 节点的 `steps` |
+| `"${cfg}"` | `guidance_scale` | KSampler 节点的 `cfg` |
+| `"${width}"` | 从 `default_size` 解析 | EmptyLatentImage 节点的 `width` |
+| `"${height}"` | 从 `default_size` 解析 | EmptyLatentImage 节点的 `height` |
+| `"${denoise}"` | 图生图降噪强度 | KSampler 节点的 `denoise` |
+| `"${image}"` | 用户发送的图片（自动上传） | LoadImage 节点的 `image` |
+
+**示例** — 工作流 JSON 片段：
+```json
+{
+  "3": {
+    "inputs": {
+      "seed": "${seed}",
+      "steps": "${steps}",
+      "cfg": "${cfg}",
+      "sampler_name": "dpmpp_2m",
+      "denoise": "${denoise}",
+      "model": ["4", 0],
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "latent_image": ["5", 0]
+    },
+    "class_type": "KSampler"
+  },
+  "5": {
+    "inputs": {
+      "width": "${width}",
+      "height": "${height}",
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage"
+  },
+  "6": {
+    "inputs": {
+      "text": "${prompt}",
+      "clip": ["4", 1]
+    },
+    "class_type": "CLIPTextEncode"
+  },
+  "7": {
+    "inputs": {
+      "text": "${negative_prompt}",
+      "clip": ["4", 1]
+    },
+    "class_type": "CLIPTextEncode"
+  }
+}
 ```
 
-**Gemini**:
-```toml
-format = "gemini"
-base_url = "https://generativelanguage.googleapis.com"
-api_key = "Bearer AIzaSy..."  # 会自动去除 Bearer 前缀
-model = "gemini-2.0-flash-exp"
-default_size = "16:9"         # 宽高比格式
-# 或 "16:9-2K" (宽高比+分辨率，仅 Gemini 3)
-# 或 "-2K" (仅指定分辨率，LLM 选宽高比)
-```
-
-**魔搭社区**:
-```toml
-format = "modelscope"
-base_url = "https://api-inference.modelscope.cn/v1"
-# 自动使用异步任务模式，轮询获取结果
-```
-
-**砂糖云 (NovelAI)**:
-```toml
-format = "shatangyun"
-base_url = "https://std.loliyc.com"
-api_key = "Bearer token_here"
-model = "nai-diffusion-4-5-full"
-artist = "artist_tag"           # 艺术家标签（砂糖云专用）
-cfg = 0                         # CFG Rescale
-sampler = "k_euler_ancestral"   # 采样器
-nocache = 0                     # 禁用缓存
-noise_schedule = "karras"       # 噪声调度
-```
-
-**梦羽 AI**:
-```toml
-format = "mengyuai"
-base_url = "https://sd.exacg.cc"
-model = "0"                     # 模型索引数字
-support_img2img = false         # 不支持图生图（需要外部图片上传服务）
-```
-
-**Zai (Gemini 转发)**:
-```toml
-format = "zai"
-base_url = "https://zai.is/api"
-# 尺寸处理同 Gemini：自动转换为宽高比
-```
-
-**ComfyUI**:
-```toml
-format = "comfyui"
-base_url = "http://127.0.0.1:8188"  # ComfyUI 服务地址（支持代理配置）
-model = "my_workflow.json"           # 工作流文件名（放在 workflow/ 目录下）
-api_key = ""                         # 不需要
-# 工作流中使用占位符：${prompt}、${seed}、${image}
-```
-
-### 网络配置
-
-```toml
-[proxy]
-enabled = false
-url = "http://127.0.0.1:7890"  # 支持 HTTP/HTTPS/SOCKS5
-timeout = 60
-
-[cache]
-enabled = true
-max_size = 10                   # 最大缓存数量
-```
+> 不使用的占位符可以不写，对应字段会保持工作流中的原始值，完全向后兼容。
 
 ### 功能配置
 
@@ -260,86 +266,116 @@ cartoon = "卡通,动漫"
 watercolor = "水彩"
 ```
 
-使用: `/dr cartoon` 或 `/dr 卡通`
+## 💡 使用示例
+
+### 自然语言生图（可以指定model1，model2 等，支持中文）
+```
+用户：麦麦，画一张美少女
+麦麦：[生成图片]
+
+用户：[发送图片]
+用户：[回复 麦麦： [图片] ]，说：麦麦，把这张图的背景换成海滩
+麦麦：[图生图：基于输入图片生成]
+```
+
+### 自拍模式
+```
+用户：麦麦，来张自拍！
+麦麦：[生成Bot角色的自拍照片，包含随机手部动作]
+```
+
+### 图生图
+```
+用户：[发送图片]
+用户：[回复 麦麦： [图片] ]，说：麦麦，把这张图的背景换成海滩
+麦麦：[生成修改后的图片]
+```
+
+### 命令式风格转换（仅图生图）
+```
+用户：[发送图片]
+用户：[回复 麦麦： [图片] ]，说：/dr cartoon
+麦麦：[应用卡通风格]
+```
+
+### 命令式自然语言生成（文/图生图）
+```
+用户：/dr 画一只可爱的猫
+麦麦：[文生图：生成新图片]
+
+用户：[发送图片]
+用户：[回复 麦麦： [图片] ]，说：麦麦，把这张图的背景换成海滩
+麦麦：[图生图：基于输入图片生成]
+```
+
+### 动态切换模型
+```
+用户：/dr list
+麦麦：📋 可用模型列表：
+• model1 ✅[默认] 🔧[命令] 🖼️[图生图]
+• model2 📝[仅文生图]
+
+用户：/dr set model2
+麦麦：✅ 图生图命令模型已成功切换！
+```
+## 魔搭链接及教程
+
+==具体流程步骤如下：==
+
+1. 注册一个魔搭账号。
+2. 然后你需要根据魔搭[官网阿里云绑定教程](https://modelscope.cn/docs/accounts/aliyun-binding-and-authorization)完成阿里云认证。
+3. 接着到你的魔搭主页申请一个 API key，参考[API推理介绍](https://modelscope.cn/docs/model-service/API-Inference/intro)。
+4. 现在你已经拥有了一个 key 可以直接去[模型库](https://modelscope.cn/models)挑选你想要使用的生图模型了，在每个模型的详细里都会有一段教程告诉你怎么使用，我们只需要取可以使用 API 推理的模型的模型名称就好了。
+5. 在该插件的配置文件中填入你获取的 key ，选择魔搭对应的请求地址，然后填入对应的模型名称即可。剩下的相关配置根据配置文件中的注释填入。
+
+## 🔧 依赖说明
+
+- 需 Python 3.12+
+- 依赖 MaiBot 插件系统（0.8.0 新插件系统，测试兼容 0.10.0+）
+- 火山方舟 api 需要通过 pip install 'volcengine-python-sdk[ark]' 安装方舟SDK
+
+## ⚠️ 注意事项
+
+- 请妥善保管 API 密钥，不要在公开场合泄露，各平台 API 可能有调用频率限制，请注意控制使用频率，生成的图片内容受模型和提示词影响，请遵守相关平台的使用规范
+- 模型是否支持图生图请参考各平台官方文档（注：在`support_img2img = true` - 是否支持图生图中填写true/false，请自行判断）
+- Action组件、魔搭、Grok、梦羽AI和砂糖云不支持图生图功能（注：梦羽AI和砂糖云支持NSFW，请自行判断）
+
+## 常见问题
+
+- **API 密钥未配置/错误**：请检查 `config.toml` 中对应模型的 api_key 配置。
+- **图片描述为空**：需提供明确的图片描述。
+- **图片尺寸无效**：支持如 `1024x1024`，宽高范围 100~10000。
+- **依赖缺失**：请确保 MaiBot 插件系统相关依赖已安装。
+- **api 调用报错**
+400：参数不正确，请参考报错信息（message）修正不合法的请求参数，可能为插件发送的报文不兼容对应 api 供应商；
+401：API Key 没有正确设置；
+403：权限不够，最常见的原因是该模型需要实名认证，其他情况参考报错信息（message）；
+429：触发了 rate limits；参考报错信息（message）判断触发的是 RPM /RPD / TPM / TPD / IPM / IPD 中的具体哪一种，可以参考 Rate Limits 了解具体的限流策略
+504 / 503：一般是服务系统负载比较高，可以稍后尝试；
+
+## 贡献和反馈
+
+*制作者水平有限，任何漏洞、疑问或建议,欢迎提交 Issue 和 Pull Request！
+或联系QQ：1021143806,3082618311*
 
 ---
 
-## 插件结构
+## 🤝 基于 MaiBot 项目
+- 支持 0.8.x - 0.10.x
+  - 0.9.x 升级仅配置文件新增两个字段，所以不影响 0.8 版本使用，
+  - 0.10 修改支持版本号可直接加载成功
+  - 目前改为一直支持最新版
 
-```
-mais_art_journal/
-├── plugin.py                     # 入口：注册组件、配置管理（MaisArtJournalPlugin）
-├── config.toml                   # 配置文件（自动生成）
-├── workflow/                     # ComfyUI 工作流目录
-├── core/
-│   ├── pic_action.py             # Action 组件（MaisArtAction，LLM 触发）
-│   ├── pic_command.py            # Command 组件（/dr 命令）
-│   ├── config_manager.py         # 增强配置管理（版本检测、备份、合并）
-│   ├── api_clients/              # API 客户端
-│   │   ├── __init__.py           # 统一入口 + standalone 接口
-│   │   ├── base_client.py        # 基类（重试、代理、工具方法）
-│   │   ├── openai_client.py      # OpenAI 格式
-│   │   ├── openai_chat_client.py # OpenAI Chat 格式
-│   │   ├── doubao_client.py      # 豆包
-│   │   ├── gemini_client.py      # Gemini
-│   │   ├── modelscope_client.py  # 魔搭
-│   │   ├── shatangyun_client.py  # 砂糖云
-│   │   ├── mengyuai_client.py    # 梦羽 AI
-│   │   ├── zai_client.py         # Zai
-│   │   └── comfyui_client.py     # ComfyUI
-│   ├── selfie/                   # 自动自拍子系统
-│   │   ├── auto_selfie_task.py   # 后台定时任务
-│   │   ├── schedule_provider.py  # 日程适配（读 autonomous_planning DB）
-│   │   ├── scene_action_generator.py # 场景提示词生成
-│   │   └── caption_generator.py  # 配文生成（基于日程+人设+表达风格）
-│   └── utils/                    # 工具模块
-│       ├── model_utils.py        # 模型配置管理
-│       ├── image_utils.py        # 图片处理
-│       ├── image_send_utils.py   # base64/URL 统一解析
-│       ├── size_utils.py         # 尺寸处理 + LLM 选尺寸
-│       ├── cache_manager.py      # 结果缓存
-│       ├── recall_utils.py       # 自动撤回
-│       ├── prompt_optimizer.py   # 提示词优化（普通模式+自拍场景模式）
-│       ├── runtime_state.py      # 运行时状态（按聊天流管理）
-│       ├── time_utils.py         # 时间工具
-│       └── shared_constants.py   # 共享常量
-```
+插件开发历程
 
----
+- 该插件基于 MaiBot 最早期官方豆包生图示例插件修改而来，最早我是为了兼容 GPT 生图进行修改，添加对 GPT 生图模型直接返回 base64 格式图片的兼容判断，因为 GPT 生图太贵了，所以后续想兼容魔搭社区的免费生图，新增一层报文兼容。（我不是计算机专业，大部分代码来自 DeepSeek R1 研究了很久，不得不说确实很好玩。）
+- 目前支持三种报文返回，即三个平台的图片返回报文 url，image，base64，如果其他平台返回的报文符合以上三种格式也可以正常使用，可以自行尝试。
+- MaiBot 0.8 版本更新，根据新插件系统进行重构。
+- Rabbit-Jia-Er 加入，添加可以调用多个模型和命令功能。
+- saberlights Kiuon 加入，添加自拍功能和自然语言命令功能。
 
-## 调用链
+## 🔗 版权信息
 
-### Action 组件
-
-```
-用户发消息 → MaiBot LLM 判定触发 → execute()
-  → 运行时状态检查（插件开关、模型开关）
-  → 提取描述 / 检测自拍模式
-  → 提示词优化（LLM，自拍模式使用 scene_only）
-  → 检测输入图片（自动判断文/图生图）
-  → 获取模型配置 → 尺寸处理 → 合并负面提示词
-  → ApiClient.generate_image() → 具体客户端._make_request()
-  → process_api_response() 解析响应
-  → resolve_image_data() URL→base64
-  → send_image() → 缓存 → 自动撤回
-```
-
-### Command 组件
-
-```
-用户发送 /dr xxx → 正则匹配 → execute()
-  → 风格匹配: _execute_style_mode()（图生图）
-  → 自然语言: _execute_natural_mode()（文/图生图）
-  → 同上的 API 调用链
-```
-
-### 自动自拍
-
-```
-定时触发 → 安静时段检查
-  → ScheduleProvider 查询 autonomous_planning 数据库
-  → 获取当前活动（无活动则跳过）
-  → 场景提示词生成（动作/环境/表情/光线组合）
-  → generate_image_standalone() 独立生图
-  → generate_caption() 基于日程+人设+表达风格生成配文（失败则跳过不发）
-  → Maizone QZone API 发布说说
+- 作者：Ptrel, Rabbit-Jia-Er, saberlights Kiuon
+- 许可证：GPL-v3.0-or-later
+- 项目主页：https://github.com/Rabbit-Jia-Er/mais-art-journal

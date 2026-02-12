@@ -1,5 +1,6 @@
 import asyncio
 import re
+import time as time_module
 from typing import Tuple, Optional, Dict, Any
 
 from src.plugin_system.base.base_command import BaseCommand
@@ -64,6 +65,17 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
     command_description = "图生图命令，使用风格化提示词：/dr <风格> 或自然语言：/dr <描述>"
     # 排除配置管理保留词，避免与 PicConfigCommand 和 PicStyleCommand 重复匹配
     command_pattern = r"(?:.*，说：\s*)?/dr\s+(?!list\b|models\b|config\b|set\b|reset\b|on\b|off\b|model\b|recall\b|default\b|styles\b|style\b|help\b)(?P<content>.+)$"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._image_processor = None
+
+    @property
+    def image_processor(self) -> "ImageProcessor":
+        """复用 ImageProcessor 实例"""
+        if self._image_processor is None:
+            self._image_processor = ImageProcessor(self)
+        return self._image_processor
 
     async def execute(self) -> Tuple[bool, Optional[str], bool]:
         """执行图生图命令，智能判断风格模式或自然语言模式"""
@@ -148,8 +160,7 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
             await self.send_text(f"使用风格：{style_name}")
 
         # 获取最近的图片作为输入图片
-        image_processor = ImageProcessor(self)
-        input_image_base64 = await image_processor.get_recent_image()
+        input_image_base64 = await self.image_processor.get_recent_image()
 
         if not input_image_base64:
             await self.send_text("请先发送图片")
@@ -189,7 +200,7 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
 
             if success:
                 # 统一处理 API 响应（dict/str 等）→ 纯字符串
-                final_image_data = image_processor.process_api_response(result)
+                final_image_data = self.image_processor.process_api_response(result)
                 if not final_image_data:
                     await self.send_text("API返回数据格式错误")
                     return False, "API返回数据格式错误", True
@@ -199,11 +210,12 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
                     final_image_data, self._download_and_encode_base64, self.log_prefix
                 )
                 if resolved_ok:
+                    send_timestamp = time_module.time()
                     send_success = await self.send_image(resolved_data)
                     if send_success:
                         if enable_debug:
                             await self.send_text(f"{style_name} 风格转换完成！")
-                        await self._schedule_auto_recall_for_recent_message(model_config, model_id)
+                        await self._schedule_auto_recall_for_recent_message(model_config, model_id, send_timestamp)
                         return True, "图生图命令执行成功", True
                     else:
                         await self.send_text("图片发送失败")
@@ -258,8 +270,7 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
         enable_debug = self.get_config("components.enable_debug_info", False)
 
         # 智能检测：判断是文生图还是图生图
-        image_processor = ImageProcessor(self)
-        input_image_base64 = await image_processor.get_recent_image()
+        input_image_base64 = await self.image_processor.get_recent_image()
         is_img2img_mode = input_image_base64 is not None
 
         if is_img2img_mode:
@@ -315,7 +326,7 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
 
             if success:
                 # 统一处理 API 响应（dict/str 等）→ 纯字符串
-                final_image_data = image_processor.process_api_response(result)
+                final_image_data = self.image_processor.process_api_response(result)
                 if not final_image_data:
                     await self.send_text("API返回数据格式错误")
                     return False, "API返回数据格式错误", True
@@ -325,11 +336,12 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
                     final_image_data, self._download_and_encode_base64, self.log_prefix
                 )
                 if resolved_ok:
+                    send_timestamp = time_module.time()
                     send_success = await self.send_image(resolved_data)
                     if send_success:
                         if enable_debug:
                             await self.send_text(f"{mode_text}完成！")
-                        await self._schedule_auto_recall_for_recent_message(model_config, model_id)
+                        await self._schedule_auto_recall_for_recent_message(model_config, model_id, send_timestamp)
                         return True, f"{mode_text}命令执行成功", True
                     else:
                         await self.send_text("图片发送失败")
@@ -410,10 +422,9 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
         proxy_url = None
         if self.get_config("proxy.enabled", False):
             proxy_url = self.get_config("proxy.url", "http://127.0.0.1:7890")
-        processor = ImageProcessor(self)
-        return processor.download_and_encode_base64(image_url, proxy_url=proxy_url)
+        return self.image_processor.download_and_encode_base64(image_url, proxy_url=proxy_url)
 
-    async def _schedule_auto_recall_for_recent_message(self, model_config: Dict[str, Any] = None, model_id: str = None):
+    async def _schedule_auto_recall_for_recent_message(self, model_config: Dict[str, Any] = None, model_id: str = None, send_timestamp: float = 0.0):
         """安排最近发送消息的自动撤回"""
         global_enabled = self.get_config("auto_recall.enabled", False)
         if not global_enabled or not model_config:
@@ -432,7 +443,7 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
             logger.info(f"{self.log_prefix} 模型 {model_id} 撤回已在当前聊天流禁用")
             return
 
-        await schedule_auto_recall(chat_id, delay_seconds, self.log_prefix, self.send_command)
+        await schedule_auto_recall(chat_id, delay_seconds, self.log_prefix, self.send_command, send_timestamp)
 
 
 class PicConfigCommand(PicCommandMixin, BaseCommand):

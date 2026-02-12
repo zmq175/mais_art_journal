@@ -2,14 +2,24 @@
 
 通过本地或远程 ComfyUI 实例的 HTTP API 生成图片：
 - 加载工作流 JSON 模板
-- 替换占位符（${prompt}、${seed}、${image}）
-- 提交任务 → 轮询结果 → 下载图片
+- 替换占位符 → 提交任务 → 轮询结果 → 下载图片
 
 配置映射：
   base_url  → ComfyUI 服务地址（如 http://127.0.0.1:8188）
   model     → 工作流文件名（相对 workflow/ 目录）
   api_key   → 不需要，留空
   seed      → 随机种子，-1 表示自动随机
+
+工作流占位符（在 JSON 中使用 "${xxx}" 格式）：
+  ${prompt}           ← 用户提示词 + custom_prompt_add
+  ${seed}             ← seed 配置值（-1 时自动随机）
+  ${negative_prompt}  ← negative_prompt_add
+  ${steps}            ← num_inference_steps
+  ${cfg}              ← guidance_scale
+  ${width}            ← 从 size 解析的宽度
+  ${height}           ← 从 size 解析的高度
+  ${denoise}          ← 图生图降噪强度（strength）
+  ${image}            ← 图生图输入图片（自动上传）
 """
 
 import base64
@@ -89,6 +99,31 @@ class ComfyUIClient(BaseApiClient):
 
         workflow_str = workflow_template.replace('"${prompt}"', json.dumps(full_prompt))
         workflow_str = workflow_str.replace('"${seed}"', str(seed))
+
+        # negative_prompt_add → ${negative_prompt}
+        negative_prompt = model_config.get("negative_prompt_add", "")
+        workflow_str = workflow_str.replace('"${negative_prompt}"', json.dumps(negative_prompt))
+
+        # num_inference_steps → ${steps}
+        steps = model_config.get("num_inference_steps", 20)
+        workflow_str = workflow_str.replace('"${steps}"', str(int(steps)))
+
+        # guidance_scale → ${cfg}
+        cfg = model_config.get("guidance_scale", 7)
+        workflow_str = workflow_str.replace('"${cfg}"', str(float(cfg)))
+
+        # size → ${width} / ${height}
+        try:
+            w, h = size.lower().split("x")
+            width, height = int(w), int(h)
+        except Exception:
+            width, height = 1024, 1024
+        workflow_str = workflow_str.replace('"${width}"', str(width))
+        workflow_str = workflow_str.replace('"${height}"', str(height))
+
+        # strength → ${denoise}（图生图降噪强度）
+        if strength is not None:
+            workflow_str = workflow_str.replace('"${denoise}"', str(float(strength)))
 
         # ---- 3. 图生图：上传图片并替换 ${image} ----
         if input_image_base64 and '"${image}"' in workflow_str:

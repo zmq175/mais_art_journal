@@ -508,7 +508,7 @@ class MaisArtJournalPlugin(BasePlugin):
             "model": ConfigField(
                 type=str,
                 default="cancel13/liaocao",
-                description="模型标识。梦羽AI 格式填模型索引数字（如 0）。ComfyUI 格式填工作流文件名（如 workflow.json）",
+                description="模型标识。梦羽AI 格式填模型索引数字（如 0）。ComfyUI 格式填工作流文件名（如 workflow.json），工作流放在插件 workflow/ 目录下，也可填绝对路径",
                 label="模型标识",
                 placeholder="model-name / 0 / workflow.json",
                 required=True,
@@ -518,7 +518,7 @@ class MaisArtJournalPlugin(BasePlugin):
             "fixed_size_enabled": ConfigField(
                 type=bool,
                 default=False,
-                description="是否固定图片尺寸。开启后强制使用 default_size，关闭则由 MaiBot LLM 根据内容自动选择。豆包格式建议开启（因为豆包不接受像素格式尺寸）",
+                description="是否固定图片尺寸。开启后强制使用 default_size，关闭则由 MaiBot LLM 根据内容自动选择。豆包格式建议开启",
                 label="固定尺寸",
                 group="params",
                 order=6
@@ -536,7 +536,7 @@ class MaisArtJournalPlugin(BasePlugin):
             "seed": ConfigField(
                 type=int,
                 default=42,
-                description="随机种子，固定值可确保结果可复现",
+                description="随机种子，固定值可确保结果可复现。-1 表示每次随机",
                 label="随机种子",
                 min=-1,
                 max=2147483647,
@@ -567,7 +567,7 @@ class MaisArtJournalPlugin(BasePlugin):
             "watermark": ConfigField(
                 type=bool,
                 default=True,
-                description="是否添加水印（仅豆包格式生效）",
+                description="是否添加水印",
                 label="水印",
                 group="params",
                 order=11
@@ -603,7 +603,7 @@ class MaisArtJournalPlugin(BasePlugin):
             "support_img2img": ConfigField(
                 type=bool,
                 default=True,
-                description="该模型是否支持图生图功能。设为false时会自动降级为文生图。梦羽AI(mengyuai)格式必须设为false",
+                description="该模型是否支持图生图功能。设为false时会自动降级为文生图",
                 label="支持图生图",
                 group="prompts",
                 order=15
@@ -638,7 +638,7 @@ class MaisArtJournalPlugin(BasePlugin):
                 description="砂糖云专用：采样器名称",
                 label="采样器",
                 hint="仅砂糖云格式生效",
-                choices=["k_euler_ancestral", "k_euler", "k_dpmpp_2m", "k_dpmpp_sde"],
+                choices=["k_euler_ancestral", "k_euler", "k_dpmpp_2s_ancestral", "k_dpmpp_2m_sde", "k_dpmpp_2m", "k_dpmpp_sde"],
                 group="platform",
                 order=21
             ),
@@ -659,7 +659,7 @@ class MaisArtJournalPlugin(BasePlugin):
                 description="砂糖云专用：噪声调度方案",
                 label="噪声调度",
                 hint="仅砂糖云格式生效",
-                choices=["karras", "exponential", "polyexponential"],
+                choices=["karras", "native", "exponential", "polyexponential"],
                 group="platform",
                 order=23
             ),
