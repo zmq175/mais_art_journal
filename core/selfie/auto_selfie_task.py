@@ -15,12 +15,12 @@
 
 import asyncio
 import base64
-import datetime
+import os
 from typing import Optional
 
 from src.common.logger import get_logger
 
-from .schedule_provider import get_schedule_provider, ActivityInfo
+from .schedule_provider import get_schedule_provider
 from .scene_action_generator import convert_to_selfie_prompt, get_negative_prompt_for_style
 from .caption_generator import generate_caption
 from ..api_clients import generate_image_standalone
@@ -129,7 +129,11 @@ class AutoSelfieTask:
         # 2. 生成自拍提示词
         selfie_style = self.get_config("auto_selfie.selfie_style", "standard")
         bot_appearance = self.get_config("selfie.prompt_prefix", "")
-        prompt = convert_to_selfie_prompt(activity, selfie_style, bot_appearance)
+        prompt = await convert_to_selfie_prompt(activity, selfie_style, bot_appearance)
+        if not prompt:
+            logger.warning("LLM 自拍提示词生成失败，跳过本次自拍")
+            return
+
         negative_prompt = get_negative_prompt_for_style(
             selfie_style,
             self.get_config("selfie.negative_prompt", ""),
@@ -153,10 +157,24 @@ class AutoSelfieTask:
                 "timeout": self.get_config("proxy.timeout", 60),
             }
 
+        # 检查参考图片（图生图模式）
+        reference_image = self._load_reference_image()
+        strength = None
+        if reference_image:
+            if model_config.get("support_img2img", True):
+                strength = 0.6
+                logger.info("使用参考图片进行图生图自拍")
+            else:
+                reference_image = None
+                logger.warning(f"模型 {selfie_model} 不支持图生图，回退文生图")
+
         success, image_data = await generate_image_standalone(
             prompt=prompt,
             model_config=model_config,
+            size=model_config.get("default_size", "1024x1024"),
             negative_prompt=negative_prompt,
+            strength=strength,
+            input_image_base64=reference_image,
             max_retries=2,
             extra_config=extra_config if extra_config else None,
         )
@@ -190,7 +208,7 @@ class AutoSelfieTask:
                 await get_napcat_config_and_renew(get_config_fn)
 
             # 将 image_data 转为 bytes
-            image_bytes = self._resolve_image_to_bytes(image_data)
+            image_bytes = await self._resolve_image_to_bytes(image_data)
             if not image_bytes:
                 logger.error("图片数据转换失败，无法发布到QQ空间")
                 return
@@ -211,13 +229,43 @@ class AutoSelfieTask:
         """获取模型配置"""
         return get_model_config(self.get_config, model_id, log_prefix="[AutoSelfie]")
 
+    def _load_reference_image(self) -> Optional[str]:
+        """加载自拍参考图片的base64编码
+
+        Returns:
+            图片的base64编码，如果不存在则返回None
+        """
+        image_path = self.get_config("selfie.reference_image_path", "").strip()
+        if not image_path:
+            return None
+
+        try:
+            # 处理相对路径（相对于插件目录）
+            if not os.path.isabs(image_path):
+                plugin_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                image_path = os.path.join(plugin_dir, image_path)
+
+            if os.path.exists(image_path):
+                with open(image_path, 'rb') as f:
+                    image_data = f.read()
+                image_base64 = base64.b64encode(image_data).decode('utf-8')
+                logger.info(f"[AutoSelfie] 从文件加载自拍参考图片: {image_path}")
+                return image_base64
+            else:
+                logger.warning(f"[AutoSelfie] 自拍参考图片文件不存在: {image_path}")
+                return None
+        except Exception as e:
+            logger.error(f"[AutoSelfie] 加载自拍参考图片失败: {e}")
+            return None
+
     @staticmethod
-    def _resolve_image_to_bytes(image_data: str) -> Optional[bytes]:
+    async def _resolve_image_to_bytes(image_data: str) -> Optional[bytes]:
         """将 base64 或 URL 格式的图片数据转为 bytes"""
         if image_data.startswith(("http://", "https://")):
             import httpx
-            resp = httpx.get(image_data, timeout=30)
-            resp.raise_for_status()
-            return resp.content
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.get(image_data)
+                resp.raise_for_status()
+                return resp.content
         else:
             return base64.b64decode(image_data)

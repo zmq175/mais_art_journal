@@ -137,7 +137,7 @@ class ImageProcessor:
                 if proxy_url:
                     import requests
                     logger.info(f"{self.log_prefix} (B64) 下载HTTP图片 (proxy: {proxy_url})")
-                    resp = requests.get(image_url, timeout=600, proxies={"http": proxy_url, "https": proxy_url})
+                    resp = requests.get(image_url, timeout=180, proxies={"http": proxy_url, "https": proxy_url})
                     if resp.status_code == 200:
                         base64_encoded_image = base64.b64encode(resp.content).decode("utf-8")
                         logger.info(f"{self.log_prefix} (B64) 图片下载编码完成. Base64长度: {len(base64_encoded_image)}")
@@ -148,7 +148,7 @@ class ImageProcessor:
                         return False, error_msg
                 else:
                     logger.info(f"{self.log_prefix} (B64) 下载HTTP图片")
-                    with urllib.request.urlopen(image_url, timeout=600) as response:
+                    with urllib.request.urlopen(image_url, timeout=180) as response:
                         if response.status == 200:
                             image_bytes = response.read()
                             base64_encoded_image = base64.b64encode(image_bytes).decode("utf-8")

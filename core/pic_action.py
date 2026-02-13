@@ -1,4 +1,3 @@
-import asyncio
 import traceback
 import base64
 import os
@@ -12,7 +11,7 @@ from src.common.logger import get_logger
 from .api_clients import get_client_class
 from .utils import (
     ImageProcessor, CacheManager, validate_image_size, get_image_size,
-    runtime_state, BASE64_IMAGE_PREFIXES, ANTI_DUAL_HANDS_PROMPT,
+    runtime_state, ANTI_DUAL_HANDS_PROMPT,
     get_model_config, merge_negative_prompt, inject_llm_original_size,
     resolve_image_data, schedule_auto_recall, optimize_prompt,
 )
@@ -120,6 +119,10 @@ class MaisArtAction(BaseAction):
         """执行统一图片生成动作"""
         logger.info(f"{self.log_prefix} 执行统一图片生成动作")
 
+        # 懒启动自动自拍任务（如果插件初始化时事件循环未就绪）
+        if hasattr(self.plugin, 'try_start_auto_selfie'):
+            self.plugin.try_start_auto_selfie()
+
         # 检查是否是 /dr 命令消息，如果是则跳过（由 Command 组件处理）
         if self.action_message and self.action_message.processed_plain_text:
             message_text = self.action_message.processed_plain_text.strip()
@@ -201,7 +204,25 @@ class MaisArtAction(BaseAction):
                 return False, "自拍功能未启用"
 
             logger.info(f"{self.log_prefix} 启用自拍模式，风格: {selfie_style}")
-            description, selfie_negative_prompt = self._process_selfie_prompt(description, selfie_style, free_hand_action, model_id)
+
+            # 尝试获取日程活动信息（增强场景上下文）
+            activity_scene = None
+            global_selfie_schedule = self.get_config("selfie.schedule_enabled", True)
+            selfie_schedule_on = runtime_state.is_selfie_schedule_enabled(self.chat_id, global_selfie_schedule)
+            if selfie_schedule_on:
+                try:
+                    from .selfie.schedule_provider import get_schedule_provider
+                    from .selfie.scene_action_generator import get_action_for_activity
+                    provider = get_schedule_provider()
+                    if provider:
+                        activity = await provider.get_current_activity()
+                        if activity:
+                            activity_scene = get_action_for_activity(activity)
+                            logger.info(f"{self.log_prefix} 获取到日程活动: {activity.activity_type.value}")
+                except Exception as e:
+                    logger.debug(f"{self.log_prefix} 获取日程活动失败（非必要）: {e}")
+
+            description, selfie_negative_prompt = self._process_selfie_prompt(description, selfie_style, free_hand_action, model_id, activity_scene)
             logger.info(f"{self.log_prefix} 自拍模式处理后的提示词: {description[:100]}...")
 
             # 检查是否配置了参考图片
@@ -241,6 +262,7 @@ class MaisArtAction(BaseAction):
         """统一的图片生成执行方法
 
         Args:
+            model_id: 模型ID，如 model1、model2
             extra_negative_prompt: 额外负面提示词（如自拍模式的 anti-dual-hands），会合并到模型配置的 negative_prompt_add
         """
 
@@ -356,7 +378,7 @@ class MaisArtAction(BaseAction):
                         if enable_debug:
                             await self.send_text(f"{mode_text}完成！")
                         self.cache_manager.cache_result(description, model_name, image_size, strength, is_img2img, resolved_data)
-                        await self._schedule_auto_recall_for_recent_message(model_config, send_timestamp)
+                        await self._schedule_auto_recall_for_recent_message(model_id, model_config, send_timestamp)
                         return True, f"{mode_text}已成功生成并发送"
                     else:
                         await self.send_text("图片已处理完成，但发送失败了")
@@ -390,7 +412,7 @@ class MaisArtAction(BaseAction):
         """验证图片尺寸格式是否正确（委托给size_utils）"""
         return validate_image_size(size)
 
-    def _process_selfie_prompt(self, description: str, selfie_style: str, free_hand_action: str, model_id: str) -> Tuple[str, str]:
+    def _process_selfie_prompt(self, description: str, selfie_style: str, free_hand_action: str, model_id: str, activity_scene: dict = None) -> Tuple[str, str]:
         """处理自拍模式的提示词生成
 
         Args:
@@ -398,6 +420,7 @@ class MaisArtAction(BaseAction):
             selfie_style: 自拍风格（standard/mirror）
             free_hand_action: LLM生成的手部动作（可选）
             model_id: 模型ID（保留参数，用于后续扩展）
+            activity_scene: 日程活动场景数据（含 hand_action, environment, expression, lighting），无日程时为 None
 
         Returns:
             (prompt, negative_prompt) 元组：处理后的正面提示词和负面提示词
@@ -418,93 +441,77 @@ class MaisArtAction(BaseAction):
             # 标准自拍风格（适用于户外或无镜子场景，前置摄像头视角）
             selfie_scene = "selfie, front camera view, arm extended, looking at camera"
 
-        # 4. 智能手部动作库（40+种动作）
-        hand_actions = [
-            # 经典手势
-            "peace sign, v sign",
-            "waving hand, friendly gesture",
-            "thumbs up, positive gesture",
-            "finger heart, cute pose",
-            "ok sign, hand gesture",
-
-            # 可爱动作
-            "touching face gently, soft expression",
-            "hand near chin, thinking pose",
-            "covering mouth with hand, shy expression",
-            "both hands on cheeks, surprised",
-            "one hand in hair, casual pose",
-
-            # 时尚姿态
-            "hand on hip, confident pose",
-            "adjusting hair, elegant gesture",
-            "fixing collar, neat appearance",
-            "checking nails, stylish pose",
-            "hand behind head, relaxed",
-
-            # 表情包系列
-            "saluting, military pose",
-            "finger gun, playful gesture",
-            "crossed arms, cool pose",
-            "hand shielding eyes, looking far",
-            "hands clasped together, pleading",
-
-            # 甜美系列
-            "blowing kiss, romantic",
-            "heart shape with hands",
-            "hugging self, content",
-            "cat paw gesture, playful",
-            "bunny ears with fingers",
-
-            # 自然动作
-            "resting chin on hand, relaxed",
-            "stretching arms, energetic",
-            "fixing glasses, nerdy",
-            "touching necklace, delicate",
-            "adjusting earring, fashionable",
-
-            # 情绪表达
-            "fist pump, excited",
-            "hands together praying, hopeful",
-            "wiping forehead, relieved",
-            "scratching head, confused",
-            "finger on lips, secretive",
-
-            # 特殊pose
-            "making frame with fingers, photographer pose",
-            "counting on fingers, cute",
-            "pointing at viewer, engaging",
-            "covering one eye, mysterious",
-            "both hands up, surprised reaction"
-        ]
-
-        # 5. 选择手部动作
+        # 4. 选择手部动作
         if free_hand_action:
             # 优先使用LLM生成的手部动作
             logger.info(f"{self.log_prefix} 使用LLM生成的手部动作: {free_hand_action}")
             hand_action = free_hand_action
+        elif activity_scene and activity_scene.get("hand_action"):
+            # 其次使用日程活动的上下文动作
+            hand_action = activity_scene["hand_action"]
+            logger.info(f"{self.log_prefix} 使用日程活动动作: {hand_action}")
         else:
-            # 兜底：随机选择一个手部动作
+            # 兜底：随机选择一个通用手部动作
+            hand_actions = [
+                "peace sign, v sign",
+                "waving hand, friendly gesture",
+                "thumbs up, positive gesture",
+                "finger heart, cute pose",
+                "ok sign, hand gesture",
+                "touching face gently, soft expression",
+                "hand near chin, thinking pose",
+                "covering mouth with hand, shy expression",
+                "both hands on cheeks, surprised",
+                "one hand in hair, casual pose",
+                "hand on hip, confident pose",
+                "adjusting hair, elegant gesture",
+                "fixing collar, neat appearance",
+                "hand behind head, relaxed",
+                "saluting, military pose",
+                "finger gun, playful gesture",
+                "crossed arms, cool pose",
+                "blowing kiss, romantic",
+                "heart shape with hands",
+                "cat paw gesture, playful",
+                "bunny ears with fingers",
+                "resting chin on hand, relaxed",
+                "stretching arms, energetic",
+                "fixing glasses, nerdy",
+                "fist pump, excited",
+                "finger on lips, secretive",
+                "pointing at viewer, engaging",
+                "covering one eye, mysterious",
+                "both hands up, surprised reaction",
+            ]
             hand_action = random.choice(hand_actions)
             logger.info(f"{self.log_prefix} 随机选择手部动作: {hand_action}")
 
-        # 6. 组装完整提示词
-        # 格式：强制主体 + Bot形象 + 手部动作 + 自拍场景 + 用户描述
+        # 5. 组装完整提示词
         prompt_parts = [forced_subject]
 
         if bot_appearance:
             prompt_parts.append(bot_appearance)
 
-        prompt_parts.extend([
-            hand_action,
-            selfie_scene,
-            description
-        ])
+        # 日程活动的表情和光线（如果有）
+        if activity_scene:
+            if activity_scene.get("expression"):
+                prompt_parts.append(f"({activity_scene['expression']}:1.2)")
+            if activity_scene.get("lighting"):
+                prompt_parts.append(activity_scene["lighting"])
 
-        # 7. 合并并去重
+        prompt_parts.append(hand_action)
+
+        # 日程活动的环境（如果有，补充到自拍场景之前）
+        if activity_scene and activity_scene.get("environment"):
+            prompt_parts.append(activity_scene["environment"])
+
+        prompt_parts.append(selfie_scene)
+        prompt_parts.append(description)
+
+        # 6. 合并并去重
         final_prompt = ", ".join(prompt_parts)
 
-        # 8. 简单的去重处理（避免重复关键词）
-        # 将提示词拆分，去除重复的关键词组合
+        # 简单的去重处理（避免重复关键词）
         keywords = [kw.strip() for kw in final_prompt.split(',')]
         seen = set()
         unique_keywords = []
@@ -563,7 +570,7 @@ class MaisArtAction(BaseAction):
             logger.error(f"{self.log_prefix} 加载自拍参考图片失败: {e}")
             return None
 
-    async def _schedule_auto_recall_for_recent_message(self, model_config: Dict[str, Any] = None, send_timestamp: float = 0.0):
+    async def _schedule_auto_recall_for_recent_message(self, model_id: str, model_config: Dict[str, Any] = None, send_timestamp: float = 0.0):
         """安排最近发送消息的自动撤回"""
         global_enabled = self.get_config("auto_recall.enabled", False)
         if not global_enabled or not model_config:
@@ -572,14 +579,6 @@ class MaisArtAction(BaseAction):
         delay_seconds = model_config.get("auto_recall_delay", 0)
         if delay_seconds <= 0:
             return
-
-        # 获取模型ID用于检查运行时撤回状态
-        model_id = None
-        models_config = self.get_config("models", {})
-        for mid, config in models_config.items():
-            if config.get("model") == model_config.get("model"):
-                model_id = mid
-                break
 
         if model_id and not runtime_state.is_recall_enabled(self.chat_id, model_id, global_enabled):
             logger.info(f"{self.log_prefix} 模型 {model_id} 撤回已在当前聊天流禁用")

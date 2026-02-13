@@ -5,12 +5,19 @@
 - 模型开关
 - 撤回开关
 - 默认模型设置
+- 自动清理长时间不活跃的聊天流状态
 """
+import time
 from typing import Dict, Any, Optional, Set
 from dataclasses import dataclass, field
 from src.common.logger import get_logger
 
 logger = get_logger("mais_art.state")
+
+# 聊天流状态在无访问后保留的最大时长（秒），默认 24 小时
+_STATE_TTL_SECONDS = 24 * 60 * 60
+# 每次清理扫描的间隔（秒），避免频繁遍历
+_CLEANUP_INTERVAL_SECONDS = 30 * 60
 
 
 @dataclass
@@ -26,6 +33,10 @@ class ChatStreamState:
     action_default_model: Optional[str] = None
     # Command组件默认模型（None表示使用全局配置）
     command_default_model: Optional[str] = None
+    # 自拍日程增强是否启用（None表示使用全局配置）
+    selfie_schedule_enabled: Optional[bool] = None
+    # 最后访问时间戳
+    last_access: float = field(default_factory=time.time)
 
 
 class RuntimeStateManager:
@@ -40,13 +51,44 @@ class RuntimeStateManager:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._states: Dict[str, ChatStreamState] = {}
+            cls._instance._last_cleanup: float = time.time()
         return cls._instance
 
     def _get_state(self, chat_id: str) -> ChatStreamState:
         """获取或创建聊天流状态"""
         if chat_id not in self._states:
             self._states[chat_id] = ChatStreamState()
-        return self._states[chat_id]
+        state = self._states[chat_id]
+        state.last_access = time.time()
+        self._maybe_cleanup()
+        return state
+
+    def _maybe_cleanup(self):
+        """定期清理长时间不活跃的聊天流状态"""
+        now = time.time()
+        if now - self._last_cleanup < _CLEANUP_INTERVAL_SECONDS:
+            return
+        self._last_cleanup = now
+        expired = [
+            cid for cid, s in self._states.items()
+            if now - s.last_access > _STATE_TTL_SECONDS and not self._has_custom_settings(s)
+        ]
+        for cid in expired:
+            del self._states[cid]
+        if expired:
+            logger.debug(f"[RuntimeState] 清理了 {len(expired)} 个不活跃的聊天流状态")
+
+    @staticmethod
+    def _has_custom_settings(state: ChatStreamState) -> bool:
+        """检查聊天流是否有用户手动设置的自定义配置（有则不清理）"""
+        return (
+            state.plugin_enabled is not None
+            or state.disabled_models
+            or state.recall_disabled_models
+            or state.action_default_model is not None
+            or state.command_default_model is not None
+            or state.selfie_schedule_enabled is not None
+        )
 
     # ==================== 插件开关 ====================
 
@@ -172,6 +214,35 @@ class RuntimeStateManager:
         state.command_default_model = None
         logger.info(f"[RuntimeState] 聊天流 {chat_id} Command默认模型已重置为全局配置")
 
+    # ==================== 自拍日程开关 ====================
+
+    def is_selfie_schedule_enabled(self, chat_id: str, global_enabled: bool) -> bool:
+        """检查自拍日程增强是否启用
+
+        Args:
+            chat_id: 聊天流ID
+            global_enabled: 全局配置的启用状态
+
+        Returns:
+            是否启用（优先使用聊天流状态，否则使用全局配置）
+        """
+        state = self._get_state(chat_id)
+        if state.selfie_schedule_enabled is not None:
+            return state.selfie_schedule_enabled
+        return global_enabled
+
+    def set_selfie_schedule_enabled(self, chat_id: str, enabled: bool) -> None:
+        """设置自拍日程增强启用状态"""
+        state = self._get_state(chat_id)
+        state.selfie_schedule_enabled = enabled
+        logger.info(f"[RuntimeState] 聊天流 {chat_id} 自拍日程增强设置为: {enabled}")
+
+    def reset_selfie_schedule_enabled(self, chat_id: str) -> None:
+        """重置自拍日程增强为全局配置"""
+        state = self._get_state(chat_id)
+        state.selfie_schedule_enabled = None
+        logger.info(f"[RuntimeState] 聊天流 {chat_id} 自拍日程增强已重置为全局配置")
+
     # ==================== 状态重置 ====================
 
     def reset_chat_state(self, chat_id: str) -> None:
@@ -189,6 +260,7 @@ class RuntimeStateManager:
             "recall_disabled_models": list(state.recall_disabled_models),
             "action_default_model": state.action_default_model,
             "command_default_model": state.command_default_model,
+            "selfie_schedule_enabled": state.selfie_schedule_enabled,
         }
 
 

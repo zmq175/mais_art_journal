@@ -1,7 +1,7 @@
 """豆包（火山引擎）API客户端"""
 from typing import Dict, Any, Tuple
 
-from .base_client import BaseApiClient, logger
+from .base_client import BaseApiClient, NonRetryableError, logger
 
 
 class DoubaoClient(BaseApiClient):
@@ -88,5 +88,16 @@ class DoubaoClient(BaseApiClient):
                 return False, "豆包API响应成功但未返回图片"
 
         except Exception as e:
+            error_str = str(e)
+            # 内容审核拒绝等永久性错误，不应重试
+            non_retryable_codes = [
+                "OutputImageSensitiveContentDetected",
+                "InputImageSensitiveContentDetected",
+                "ImageSensitiveContentDetected",
+                "ContentFilterBlocked",
+            ]
+            for code in non_retryable_codes:
+                if code in error_str:
+                    raise NonRetryableError(f"豆包内容审核拒绝: {error_str[:100]}")
             logger.error(f"{self.log_prefix} (Doubao) 请求异常: {e!r}", exc_info=True)
-            return False, f"豆包API请求失败: {str(e)[:100]}"
+            return False, f"豆包API请求失败: {error_str[:100]}"

@@ -1,4 +1,3 @@
-import asyncio
 import re
 import time as time_module
 from typing import Tuple, Optional, Dict, Any
@@ -64,7 +63,7 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
     command_name = "pic_generation_command"
     command_description = "图生图命令，使用风格化提示词：/dr <风格> 或自然语言：/dr <描述>"
     # 排除配置管理保留词，避免与 PicConfigCommand 和 PicStyleCommand 重复匹配
-    command_pattern = r"(?:.*，说：\s*)?/dr\s+(?!list\b|models\b|config\b|set\b|reset\b|on\b|off\b|model\b|recall\b|default\b|styles\b|style\b|help\b)(?P<content>.+)$"
+    command_pattern = r"(?:.*，说：\s*)?/dr\s+(?!list\b|models\b|config\b|set\b|reset\b|on\b|off\b|model\b|recall\b|default\b|styles\b|style\b|help\b|selfie\b)(?P<content>.+)$"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -452,7 +451,7 @@ class PicConfigCommand(PicCommandMixin, BaseCommand):
     # Command基本信息
     command_name = "pic_config_command"
     command_description = "图片生成配置管理：/dr <操作> [参数]"
-    command_pattern = r"(?:.*，说：\s*)?/dr\s+(?P<action>list|models|config|set|reset|on|off|model|recall|default)(?:\s+(?P<params>.*))?$"
+    command_pattern = r"(?:.*，说：\s*)?/dr\s+(?P<action>list|models|config|set|reset|on|off|model|recall|default|selfie)(?:\s+(?P<params>.*))?$"
 
     async def execute(self) -> Tuple[bool, Optional[str], bool]:
         """执行配置管理命令"""
@@ -473,7 +472,7 @@ class PicConfigCommand(PicCommandMixin, BaseCommand):
             return False, "无法获取chat_id", True
 
         # 需要管理员权限的操作
-        admin_only_actions = ["set", "reset", "on", "off", "model", "recall", "default"]
+        admin_only_actions = ["set", "reset", "on", "off", "model", "recall", "default", "selfie"]
         if not has_permission and action in admin_only_actions:
             await self.send_text("你无权使用此命令", storage_message=False)
             return False, "没有权限", True
@@ -496,6 +495,8 @@ class PicConfigCommand(PicCommandMixin, BaseCommand):
             return await self._toggle_recall(params, chat_id)
         elif action == "default":
             return await self._set_default_model(params, chat_id)
+        elif action == "selfie":
+            return await self._toggle_selfie_schedule(params, chat_id)
         else:
             await self.send_text(
                 "配置管理命令使用方法：\n"
@@ -551,15 +552,6 @@ class PicConfigCommand(PicCommandMixin, BaseCommand):
                         f"• {model_id}{default_mark}{command_mark}{img2img_mark}{disabled_mark}{recall_mark}\n"
                         f"  模型: {model_name}\n"
                     )
-
-            # 管理员额外提示
-            if is_admin:
-                message_lines.append("\n⚙️ 管理员命令：")
-                message_lines.append("• /dr on|off - 开关插件")
-                message_lines.append("• /dr model on|off <模型ID> - 开关模型")
-                message_lines.append("• /dr recall on|off <模型ID> - 开关撤回")
-                message_lines.append("• /dr default <模型ID> - 设置默认模型")
-                message_lines.append("• /dr set <模型ID> - 设置/dr命令模型")
 
             # 图例说明
             message_lines.append("\n📖 图例：✅默认 🔧/dr命令 🖼️图生图 📝仅文生图")
@@ -647,6 +639,9 @@ class PicConfigCommand(PicCommandMixin, BaseCommand):
             disabled_models = runtime_state.get_disabled_models(chat_id)
             recall_disabled = runtime_state.get_recall_disabled_models(chat_id)
 
+            global_selfie_schedule = self.get_config("selfie.schedule_enabled", True)
+            selfie_schedule = runtime_state.is_selfie_schedule_enabled(chat_id, global_selfie_schedule)
+
             # 获取模型详细信息
             action_config = self.get_config(f"models.{action_model}", {})
             command_config = self.get_config(f"models.{command_model}", {})
@@ -659,6 +654,7 @@ class PicConfigCommand(PicCommandMixin, BaseCommand):
                 f"   • 名称: {action_config.get('name', action_config.get('model', '未知')) if isinstance(action_config, dict) else '未知'}\n",
                 f"🔧 /dr命令模型: {command_model}",
                 f"   • 名称: {command_config.get('name', command_config.get('model', '未知')) if isinstance(command_config, dict) else '未知'}",
+                f"\n📸 自拍日程增强: {'✅ 启用' if selfie_schedule else '❌ 禁用'}",
             ]
 
             if disabled_models:
@@ -666,17 +662,6 @@ class PicConfigCommand(PicCommandMixin, BaseCommand):
 
             if recall_disabled:
                 message_lines.append(f"🔕 撤回已关闭: {', '.join(recall_disabled)}")
-
-            # 管理员命令提示
-            message_lines.extend([
-                "\n📖 管理员命令：",
-                "• /dr on|off - 开关插件",
-                "• /dr model on|off <模型ID> - 开关模型",
-                "• /dr recall on|off <模型ID> - 开关撤回",
-                "• /dr default <模型ID> - 设置默认模型",
-                "• /dr set <模型ID> - 设置/dr命令模型",
-                "• /dr reset - 重置所有配置"
-            ])
 
             message = "\n".join(message_lines)
             await self.send_text(message)
@@ -804,6 +789,26 @@ class PicConfigCommand(PicCommandMixin, BaseCommand):
             await self.send_text(f"设置失败：{str(e)[:100]}")
             return False, f"设置默认模型失败: {str(e)}", True
 
+    async def _toggle_selfie_schedule(self, params: str, chat_id: str) -> Tuple[bool, Optional[str], bool]:
+        """开关自拍日程增强"""
+        try:
+            action = params.strip().lower() if params else ""
+            if action not in ["on", "off"]:
+                await self.send_text("格式：/dr selfie on|off")
+                return False, "参数无效", True
+
+            enabled = action == "on"
+            runtime_state.set_selfie_schedule_enabled(chat_id, enabled)
+
+            status = "启用" if enabled else "禁用"
+            await self.send_text(f"自拍日程增强已{status}")
+            return True, f"自拍日程增强{status}成功", True
+
+        except Exception as e:
+            logger.error(f"{self.log_prefix} 切换自拍日程状态失败: {e!r}")
+            await self.send_text(f"操作失败：{str(e)[:100]}")
+            return False, f"切换自拍日程状态失败: {str(e)}", True
+
 
 class PicStyleCommand(PicCommandMixin, BaseCommand):
     """图片风格管理命令"""
@@ -930,46 +935,39 @@ class PicStyleCommand(PicCommandMixin, BaseCommand):
     async def _show_help(self) -> Tuple[bool, Optional[str], bool]:
         """显示帮助信息"""
         try:
-            # 检查用户权限
             has_permission = self._check_permission()
 
+            lines = [
+                "🎨 图片风格系统帮助\n",
+                "📋 基本命令：",
+                "• /dr <风格名> - 对最近的图片应用风格",
+                "• /dr <描述> - 自然语言生成图片",
+                "• /dr styles - 列出所有可用风格",
+                "• /dr list - 查看所有模型",
+                "• /dr config - 查看当前配置",
+            ]
+
             if has_permission:
-                # 管理员帮助信息
-                help_text = """
-🎨 图片风格系统帮助
+                lines.extend([
+                    "\n⚙️ 管理员命令：",
+                    "• /dr on|off - 开关插件",
+                    "• /dr model on|off <模型ID> - 开关模型",
+                    "• /dr recall on|off <模型ID> - 开关撤回",
+                    "• /dr selfie on|off - 开关自拍日程增强",
+                    "• /dr default <模型ID> - 设置默认模型",
+                    "• /dr set <模型ID> - 设置/dr命令模型",
+                    "• /dr style <风格名> - 查看风格详情",
+                    "• /dr reset - 重置所有配置",
+                ])
 
-📋 基本命令：
-• /dr <风格名> - 对最近的图片应用风格
-• /dr styles - 列出所有可用风格
-• /dr list - 查看所有模型
+            lines.extend([
+                "\n💡 使用流程：",
+                "1. 发送一张图片",
+                "2. 使用 /dr <风格名> 进行风格转换",
+                "3. 等待处理完成",
+            ])
 
-⚙️ 管理员命令：
-• /dr config - 查看当前配置
-• /dr set <模型ID> - 设置图生图模型
-• /dr reset - 重置为默认配置
-
-💡 使用流程：
-1. 发送一张图片
-2. 使用 /dr <风格名> 进行风格转换
-3. 等待处理完成
-                """
-            else:
-                # 普通用户帮助信息
-                help_text = """
-🎨 图片风格系统帮助
-
-📋 可用命令：
-• /dr <风格名> - 对最近的图片应用风格
-• /dr styles - 列出所有可用风格
-• /dr list - 查看所有模型
-
-💡 使用流程：
-1. 发送一张图片
-2. 使用 /dr <风格名> 进行风格转换
-3. 等待处理完成
-                """
-
-            await self.send_text(help_text.strip())
+            await self.send_text("\n".join(lines))
             return True, "帮助信息显示成功", True
 
         except Exception as e:

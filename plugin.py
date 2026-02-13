@@ -371,6 +371,15 @@ class MaisArtJournalPlugin(BasePlugin):
                 depends_on="selfie.enabled",
                 depends_value=True,
                 order=4
+            ),
+            "schedule_enabled": ConfigField(
+                type=bool,
+                default=True,
+                description="是否启用日程增强自拍。开启后手动自拍会结合日程活动数据生成更贴合情境的场景（需安装 autonomous_planning 插件）。可通过 /dr selfie on|off 按聊天流覆盖",
+                label="日程增强",
+                depends_on="selfie.enabled",
+                depends_value=True,
+                order=5
             )
         },
         "auto_recall": {
@@ -535,7 +544,7 @@ class MaisArtJournalPlugin(BasePlugin):
             ),
             "seed": ConfigField(
                 type=int,
-                default=42,
+                default=-1,
                 description="随机种子，固定值可确保结果可复现。-1 表示每次随机",
                 label="随机种子",
                 min=-1,
@@ -691,19 +700,33 @@ class MaisArtJournalPlugin(BasePlugin):
 
         # 初始化自动自拍任务
         self._auto_selfie_task = None
+        self._auto_selfie_pending = False
         if self.get_config("auto_selfie.enabled", False):
             from .core.selfie import AutoSelfieTask
             self._auto_selfie_task = AutoSelfieTask(self)
             try:
                 asyncio.create_task(self._start_auto_selfie_after_delay())
             except RuntimeError:
-                print("[MaisArtJournal] 事件循环未就绪，自动自拍任务将在下次启动时尝试")
+                # 事件循环未就绪，标记待启动，在首次组件执行时懒启动
+                self._auto_selfie_pending = True
+                print("[MaisArtJournal] 事件循环未就绪，自动自拍任务将在首次执行时懒启动")
 
     async def _start_auto_selfie_after_delay(self):
         """延迟启动自动自拍任务"""
         await asyncio.sleep(15)
         if self._auto_selfie_task:
             await self._auto_selfie_task.start()
+            self._auto_selfie_pending = False
+
+    def try_start_auto_selfie(self):
+        """尝试懒启动自动自拍任务（供组件首次执行时调用）"""
+        if not self._auto_selfie_pending or not self._auto_selfie_task:
+            return
+        try:
+            asyncio.create_task(self._start_auto_selfie_after_delay())
+            self._auto_selfie_pending = False
+        except RuntimeError:
+            pass  # 仍无事件循环，下次再试
 
     def _enhance_config_management(self, original_config=None):
         """增强配置管理：备份、版本检查、智能合并

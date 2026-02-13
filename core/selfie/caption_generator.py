@@ -107,6 +107,18 @@ async def generate_caption(
                 logger.warning("LLM 返回配文过短，视为失败")
                 return ""
 
+            # 完整性检查：配文应以标点或表情结尾，否则可能被截断
+            valid_endings = ("。", "！", "？", "~", "～", "…", ")", "）",
+                            "」", "'", '"', "♪", "☆", "♡",
+                            "呢", "哦", "啊", "呀", "吧", "了", "嘛", "哈", "噢", "耶")
+            if len(caption) >= 8 and not caption.endswith(valid_endings):
+                # 尝试截断到最后一个完整句子
+                for punct in ("。", "！", "？", "~", "～", "…"):
+                    last_pos = caption.rfind(punct)
+                    if last_pos > 0:
+                        caption = caption[:last_pos + 1]
+                        break
+
             logger.info(f"LLM 生成配文: {caption}")
             return caption
         else:

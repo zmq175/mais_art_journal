@@ -150,6 +150,7 @@ async def generate_image_standalone(
     model_config: Dict[str, Any],
     size: str = "1024x1024",
     negative_prompt: Optional[str] = None,
+    strength: Optional[float] = None,
     input_image_base64: Optional[str] = None,
     max_retries: int = 2,
     extra_config: Optional[Dict[str, Any]] = None,
@@ -163,6 +164,7 @@ async def generate_image_standalone(
         model_config: 模型配置字典，必须包含 base_url, api_key, format, model 等字段
         size: 图片尺寸，默认 "1024x1024"
         negative_prompt: 额外负面提示词，会合并到 model_config 的 negative_prompt_add
+        strength: 图生图强度（0.0-1.0），仅图生图时使用
         input_image_base64: 输入图片的 base64 编码（图生图用）
         max_retries: 最大重试次数
         extra_config: 额外配置（如 proxy 设置），格式同 config.toml 结构
@@ -192,6 +194,7 @@ async def generate_image_standalone(
             prompt=prompt,
             model_config=merged_config,
             size=size,
+            strength=strength,
             input_image_base64=input_image_base64,
             max_retries=max_retries,
         )

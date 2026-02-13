@@ -7,6 +7,11 @@ from src.common.logger import get_logger
 logger = get_logger("mais_art.api")
 
 
+class NonRetryableError(Exception):
+    """不可重试的错误（如内容审核拒绝），直接终止重试循环"""
+    pass
+
+
 class BaseApiClient:
     """API客户端基类"""
 
@@ -152,6 +157,10 @@ class BaseApiClient:
                 else:
                     logger.error(f"{self.log_prefix} 重试 {max_retries} 次后API调用仍失败: {result}")
                     return False, result
+
+            except NonRetryableError as e:
+                logger.error(f"{self.log_prefix} 不可重试的错误，跳过剩余重试: {e}")
+                return False, str(e)
 
             except Exception as e:
                 if attempt < max_retries:

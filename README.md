@@ -7,7 +7,7 @@
 ### 🎯 智能图片生成
 - **文生图**: 根据对话内容自动生成图片
 - **图生图**: 检测到消息中有图片时自动使用图生图模式
-- **自拍模式**: 根据手部动作库生成自拍提示词，可配置参考图
+- **自拍模式**: 根据手部动作库生成自拍提示词，支持日程活动增强场景（需 autonomous_planning 插件），可配置参考图进行图生图
 - **提示词优化**: 自动将中文描述优化为专业英文 SD 提示词（自拍模式仅优化场景，不干扰角色外观）
 - **结果缓存**: 相同参数复用之前的结果
 - **自动撤回**: 可按模型配置延时撤回
@@ -41,6 +41,7 @@
 | `/dr model on\|off <模型ID>` | 开关指定模型 |
 | `/dr recall on\|off <模型ID>` | 开关指定模型的撤回 |
 | `/dr on` / `/dr off` | 开关插件（当前聊天流） |
+| `/dr selfie on\|off` | 开关自拍日程增强（当前聊天流） |
 | `/dr reset` | 重置当前聊天流的所有运行时配置 |
 
 > 运行时配置（模型切换、开关等）仅保存在内存中，重启后恢复为 config.toml 的全局设置。
@@ -56,8 +57,10 @@
 **特性**:
 - 可配置间隔（默认 2 小时）
 - 安静时段控制（默认 00:00-07:00 不发）
-- 12 种活动类型的场景/动作/表情/光线随机组合
+- LLM 根据日程活动描述生成英文 SD 场景标签（动作/环境/表情/光线），LLM 失败则跳过本次自拍
+- 支持参考图片进行图生图自拍（可配置 `selfie.reference_image_path`，模型不支持时自动回退文生图）
 - 配文基于日程活动 + MaiBot 人设 + 表达风格自然生成，生成失败则跳过不发
+- 连续失败指数退避，避免频繁请求
 - 无日程数据时自动跳过，不会发空内容
 
 ---
@@ -230,9 +233,10 @@ support_img2img = false              # 需工作流中包含 ${image} 占位符
 ```toml
 [selfie]
 enabled = true
-reference_image_path = ""         # 参考图路径（留空=纯文生图）
+reference_image_path = ""         # 参考图路径（留空=纯文生图，配置后自动图生图）
 prompt_prefix = "blue hair, red eyes, 1girl"  # Bot 外观描述
 negative_prompt = ""              # 额外负面提示词（自动附加 anti-dual-hands）
+schedule_enabled = true           # 日程增强（结合 autonomous_planning 日程数据），可通过 /dr selfie on|off 按聊天流覆盖
 
 [auto_recall]
 enabled = false                   # 总开关，需在模型配置中设置 auto_recall_delay > 0

@@ -156,6 +156,7 @@ class PlanningPluginProvider(ScheduleProvider):
 
         # 类型映射（覆盖 autonomous_planning 常用的 goal_type 值）
         type_map = {
+            # 英文关键词
             "work": ActivityType.WORKING,
             "study": ActivityType.STUDYING,
             "exercise": ActivityType.EXERCISING,
@@ -168,6 +169,43 @@ class PlanningPluginProvider(ScheduleProvider):
             "sleep": ActivityType.SLEEPING,
             "self_care": ActivityType.SELF_CARE,
             "commut": ActivityType.COMMUTING,
+            # 中文关键词
+            "工作": ActivityType.WORKING,
+            "办公": ActivityType.WORKING,
+            "会议": ActivityType.WORKING,
+            "学习": ActivityType.STUDYING,
+            "阅读": ActivityType.STUDYING,
+            "读书": ActivityType.STUDYING,
+            "审阅": ActivityType.STUDYING,
+            "看书": ActivityType.STUDYING,
+            "研究": ActivityType.STUDYING,
+            "运动": ActivityType.EXERCISING,
+            "锻炼": ActivityType.EXERCISING,
+            "健身": ActivityType.EXERCISING,
+            "散步": ActivityType.EXERCISING,
+            "吃": ActivityType.EATING,
+            "餐": ActivityType.EATING,
+            "料理": ActivityType.EATING,
+            "烹饪": ActivityType.EATING,
+            "休息": ActivityType.RELAXING,
+            "放松": ActivityType.RELAXING,
+            "泡澡": ActivityType.RELAXING,
+            "泡浴": ActivityType.RELAXING,
+            "聊天": ActivityType.SOCIALIZING,
+            "交流": ActivityType.SOCIALIZING,
+            "社交": ActivityType.SOCIALIZING,
+            "睡": ActivityType.SLEEPING,
+            "梦": ActivityType.SLEEPING,
+            "入眠": ActivityType.SLEEPING,
+            "午休": ActivityType.SLEEPING,
+            "小憩": ActivityType.SLEEPING,
+            "梳妆": ActivityType.SELF_CARE,
+            "打扮": ActivityType.SELF_CARE,
+            "化妆": ActivityType.SELF_CARE,
+            "护肤": ActivityType.SELF_CARE,
+            "通勤": ActivityType.COMMUTING,
+            "赶路": ActivityType.COMMUTING,
+            "出行": ActivityType.COMMUTING,
         }
         activity_type = ActivityType.OTHER
         for key, atype in type_map.items():
