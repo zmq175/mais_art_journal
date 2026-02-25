@@ -43,7 +43,11 @@ class DoubaoClient(BaseApiClient):
                     "http://": proxy_url,
                     "https://": proxy_url
                 }
-                client_kwargs["timeout"] = proxy_config["timeout"]
+                # 豆包生图较慢，超时翻倍（至少 120 秒）
+                base_timeout = proxy_config.get("timeout", 60)
+                client_kwargs["timeout"] = max(base_timeout * 2, 120)
+            else:
+                client_kwargs["timeout"] = 120  # 无代理时默认 120 秒
 
             client = Ark(**client_kwargs)
 
