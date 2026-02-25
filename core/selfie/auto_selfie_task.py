@@ -196,16 +196,27 @@ class AutoSelfieTask:
 
         # 5. 发到QQ空间
         try:
-            from plugins.Maizone.qzone import create_qzone_api
-            from plugins.Maizone.helpers import get_napcat_config_and_renew
+            from plugins.Maizone.qzone_api import create_qzone_api
+            from plugins.Maizone.cookie_manager import renew_cookies, get_cookie_file_path
             from src.plugin_system.core import component_registry
             from src.plugin_system.apis import config_api
 
-            # 刷新 Cookie
-            maizone_cfg = component_registry.get_plugin_config('MaizonePlugin')
-            if maizone_cfg:
-                get_config_fn = lambda key, default=None: config_api.get_plugin_config(maizone_cfg, key, default)
-                await get_napcat_config_and_renew(get_config_fn)
+            # Cookie：已有本地 cookie 文件则直接使用，否则再通过 Napcat/clientkey/qrcode/local 刷新
+            qq_account = config_api.get_global_config('bot.qq_account', '')
+            cookie_file = get_cookie_file_path(qq_account)
+            if not os.path.exists(cookie_file):
+                maizone_cfg = component_registry.get_plugin_config('MaizonePlugin')
+                if maizone_cfg:
+                    host = config_api.get_plugin_config(maizone_cfg, 'plugin.http_host', '127.0.0.1')
+                    port = config_api.get_plugin_config(maizone_cfg, 'plugin.http_port', '9999')
+                    napcat_token = config_api.get_plugin_config(maizone_cfg, 'plugin.napcat_token', '')
+                    cookie_methods = config_api.get_plugin_config(
+                        maizone_cfg, 'plugin.cookie_methods',
+                        ['napcat', 'clientkey', 'qrcode', 'local'],
+                    )
+                    await renew_cookies(host, port, napcat_token, cookie_methods)
+            else:
+                logger.debug("已有 Cookie 文件，直接使用，跳过刷新")
 
             # 将 image_data 转为 bytes
             image_bytes = await self._resolve_image_to_bytes(image_data)
