@@ -241,33 +241,41 @@ class AutoSelfieTask:
         return get_model_config(self.get_config, model_id, log_prefix="[AutoSelfie]")
 
     def _load_reference_image(self) -> Optional[str]:
-        """加载自拍参考图片的base64编码
+        """加载自拍参考图片的base64编码。支持多张：配置逗号分隔路径时随机选一张，增加多样性。
 
         Returns:
             图片的base64编码，如果不存在则返回None
         """
-        image_path = self.get_config("selfie.reference_image_path", "").strip()
-        if not image_path:
+        import random
+
+        raw = self.get_config("selfie.reference_image_path", "").strip()
+        if not raw:
             return None
 
-        try:
-            # 处理相对路径（相对于插件目录）
-            if not os.path.isabs(image_path):
-                plugin_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                image_path = os.path.join(plugin_dir, image_path)
+        paths = [p.strip() for p in raw.split(",") if p.strip()]
+        if not paths:
+            return None
 
-            if os.path.exists(image_path):
-                with open(image_path, 'rb') as f:
-                    image_data = f.read()
-                image_base64 = base64.b64encode(image_data).decode('utf-8')
-                logger.info(f"[AutoSelfie] 从文件加载自拍参考图片: {image_path}")
-                return image_base64
-            else:
-                logger.warning(f"[AutoSelfie] 自拍参考图片文件不存在: {image_path}")
-                return None
+        plugin_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        existing = []
+        for p in paths:
+            full = p if os.path.isabs(p) else os.path.join(plugin_dir, p)
+            if os.path.exists(full):
+                existing.append(full)
+        if not existing:
+            logger.warning(f"[AutoSelfie] 自拍参考图片均不存在: {paths}")
+            return None
+
+        image_path = random.choice(existing)
+        try:
+            with open(image_path, 'rb') as f:
+                image_data = f.read()
+            image_base64 = base64.b64encode(image_data).decode('utf-8')
+            logger.info(f"[AutoSelfie] 从文件加载自拍参考图片: {image_path}")
+            return image_base64
         except Exception as e:
             logger.error(f"[AutoSelfie] 加载自拍参考图片失败: {e}")
-            return None
+        return None
 
     @staticmethod
     async def _resolve_image_to_bytes(image_data: str) -> Optional[bytes]:

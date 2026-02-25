@@ -341,9 +341,9 @@ class MaisArtJournalPlugin(BasePlugin):
             "reference_image_path": ConfigField(
                 type=str,
                 default="",
-                description="自拍参考图片路径（相对于插件目录或绝对路径）。配置后自动使用图生图模式，留空则使用纯文生图。若模型不支持图生图会自动回退",
+                description="自拍参考图片路径（相对于插件目录或绝对路径）。支持多张：用逗号分隔多个路径，每次生成随机选一张。配置后自动图生图，留空则纯文生图",
                 label="参考图片",
-                placeholder="images/reference.png",
+                placeholder="images/ref1.png, images/ref2.png",
                 depends_on="selfie.enabled",
                 depends_value=True,
                 order=2

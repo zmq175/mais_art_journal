@@ -59,7 +59,7 @@
 - 可配置间隔（默认 2 小时）
 - 安静时段控制（默认 00:00-07:00 不发）
 - LLM 根据日程活动描述生成风格感知的英文 SD 场景标签（动作/环境/表情/光线），自动适配 standard/mirror/photo 的物理约束，LLM 失败则跳过本次自拍
-- 支持参考图片进行图生图自拍（可配置 `selfie.reference_image_path`，模型不支持时自动回退文生图）
+- 支持参考图片进行图生图自拍（可配置 `selfie.reference_image_path`，支持逗号分隔多路径每次随机选一张，模型不支持时自动回退文生图）
 - 配文基于日程活动 + MaiBot 人设 + 表达风格自然生成，生成失败则跳过不发
 - 连续失败指数退避，避免频繁请求，无日程数据时自动跳过，不会发空内容
 
@@ -233,7 +233,7 @@ support_img2img = false              # 需工作流中包含 ${image} 占位符
 ```toml
 [selfie]
 enabled = true
-reference_image_path = ""         # 参考图路径（留空=纯文生图，配置后自动图生图）
+reference_image_path = ""         # 参考图路径（留空=纯文生图，配置后自动图生图）。支持多张：逗号分隔如 "ref1.png, ref2.png"，每次随机选一张
 prompt_prefix = "blue hair, red eyes, 1girl"  # Bot 外观描述
 negative_prompt = ""              # 额外负面提示词（自动附加手部质量负面提示词）
 schedule_enabled = true           # 日程增强（结合 autonomous_planning 日程数据），可通过 /dr selfie on|off 按聊天流覆盖
