@@ -70,6 +70,7 @@ class MaisArtAction(BaseAction):
 4. 用户说"拍一张"、"发一张照片"、"来张自拍"、"照镜子"、"对镜拍"等，在未指定画其他内容时，应理解为自拍请求
 5. 与自拍相关的模糊请求（如"发张图"、"来张图"、"看看你"）在私聊或用户@你的前提下，优先选择自拍而非普通画图
 6. **雌竞倾向**：当对话涉及其他人、其他女生、或用户对他人表示兴趣/夸奖时，你会有想争取注意、展现自己的冲动——此时可以主动选择发自拍，用自拍来"抢回"关注、证明自己更好看
+7. **反击倾向**：当你被攻击、吐槽、贬低、嘲讽（如说你丑、不好看、比不上别人、不行等）时，你有不服输的一面，可以主动发自拍回击——用自拍证明自己好看、打脸对方
 
 **绝对不要使用的情况：**
 1. 群聊中用户没有@你或叫你的名字，即使消息内容涉及画图
@@ -106,7 +107,8 @@ class MaisArtAction(BaseAction):
         "支持指定模型：用户可以通过'用模型1画'、'model2生成'等方式指定特定模型",
         "自拍模式选择：用户要求'自拍/拍个自拍'时用standard；要求'照镜子/对镜拍'时用mirror；要求'拍张照片/画一张你在XX的照片/第三人称'等非自拍视角时用photo",
         "自拍倾向：当用户表达想看你、发照片、来张图等模糊请求且未明确要画其他内容时，优先选择自拍动作（selfie_mode=true）",
-        "雌竞倾向：当用户提到/夸奖其他人、其他女生，或对他人表示兴趣时，你有争强好胜的一面，愿意主动发自拍来争取注意、展现自己更好看，不必等用户明确要求"
+        "雌竞倾向：当用户提到/夸奖其他人、其他女生，或对他人表示兴趣时，你有争强好胜的一面，愿意主动发自拍来争取注意、展现自己更好看，不必等用户明确要求",
+        "反击倾向：当你被攻击、吐槽、贬低、嘲讽时（如说你丑、不好看、不行等），你有不服输的一面，愿意主动发自拍回击，用自拍证明自己"
     ]
     associated_types = ["text", "image"]
 
@@ -461,16 +463,9 @@ class MaisArtAction(BaseAction):
         # 2. 从独立的selfie配置中获取Bot的默认形象特征（不再从模型配置中获取）
         bot_appearance = self.get_config("selfie.prompt_prefix", "").strip()
 
-        # 3. 定义自拍风格特定的场景设置
-        if selfie_style == "mirror":
-            # 对镜自拍风格（适用于有镜子的室内场景）
-            selfie_scene = "mirror selfie, holding phone, reflection in mirror, bathroom, bedroom mirror, indoor"
-        elif selfie_style == "photo":
-            # 第三人称照片风格（他人拍摄视角，自然姿态）
-            selfie_scene = "photo, candid shot, natural pose, looking away or at camera, full body or upper body"
-        else:
-            # 标准自拍风格（适用于户外或无镜子场景，前置摄像头视角）
-            selfie_scene = "selfie, front camera view, arm extended, looking at camera"
+        # 3. 定义自拍风格特定的场景设置（多种变体随机选择，增加多样性）
+        selfie_scenes = self._get_selfie_scene_variants(selfie_style)
+        selfie_scene = random.choice(selfie_scenes)
 
         # 4. 选择手部动作（优先级：LLM参数 > 日程场景 > LLM按描述生成 > 风格动作池兜底）
         if free_hand_action:
@@ -554,6 +549,27 @@ class MaisArtAction(BaseAction):
         logger.info(f"{self.log_prefix} 自拍模式负面提示词: {selfie_negative_prompt[:150]}...")
         return final_prompt, selfie_negative_prompt
 
+    def _get_selfie_scene_variants(self, selfie_style: str) -> list:
+        """返回自拍风格的场景变体列表，随机选择以增加多样性"""
+        if selfie_style == "mirror":
+            return [
+                "mirror selfie, holding phone, reflection in mirror, bathroom, bedroom mirror, indoor",
+                "mirror shot, phone visible, reflection, vanity, soft mirror light",
+                "selfie in mirror, looking at reflection, indoor, warm lighting",
+            ]
+        if selfie_style == "photo":
+            return [
+                "photo, candid shot, natural pose, looking away or at camera, full body or upper body",
+                "third-person shot, natural composition, candid moment, relaxed pose",
+                "photograph, casual pose, natural lighting, medium shot or full body",
+            ]
+        # standard: 标准自拍
+        return [
+            "selfie, front camera view, arm extended, looking at camera",
+            "selfie, front facing camera, POV selfie, slight high angle, upper body",
+            "selfie, front camera, centered composition, cowboy shot, looking at lens",
+        ]
+
     # ---- 风格专用手部动作池 ----
     # standard: 一只手举手机（画面外），只有另一只手空闲，仅单手动作
     _STANDARD_HAND_ACTIONS = [
@@ -580,6 +596,12 @@ class MaisArtAction(BaseAction):
         "hand cupping own cheek, adorable",
         "hand resting on collarbone, graceful",
         "pinching own cheek, playful",
+        "hand on shoulder, casual",
+        "hand near temple, thoughtful",
+        "hand on neck, relaxed",
+        "hand under chin, elegant",
+        "hand framing face, cute",
+        "hand holding strand of hair, delicate",
     ]
 
     # mirror: 一只手拿手机对着镜子拍（画面内可见），另一只手空闲，全身或半身
@@ -604,6 +626,10 @@ class MaisArtAction(BaseAction):
         "holding strand of hair, delicate",
         "hand near face, model pose",
         "touching hat brim, fashionable",
+        "hand on chest, gentle",
+        "hand near neck, elegant",
+        "adjusting bracelet, delicate",
+        "hand on door frame, casual",
     ]
 
     # photo: 他人拍摄视角，双手都自由，可以有更自然丰富的全身姿态
@@ -633,6 +659,12 @@ class MaisArtAction(BaseAction):
         "holding umbrella, rainy atmosphere",
         "hand reaching out toward camera, inviting",
         "sitting on bench, legs crossed, elegant",
+        "hands in sleeves, cozy winter look",
+        "holding camera, photographer pose",
+        "crossed arms, confident stance",
+        "hand touching scarf, stylish",
+        "hands on bicycle handlebar, outdoor",
+        "hand holding phone to ear, talking",
     ]
 
     @staticmethod

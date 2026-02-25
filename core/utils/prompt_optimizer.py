@@ -34,16 +34,18 @@ Output: cyberpunk cityscape, neon lights, futuristic buildings, flying cars, rai
 Now convert the following description to an English prompt:"""
 
 # 自拍场景专用提示词：只生成场景/环境/光线/氛围，不生成角色外观
-SELFIE_SCENE_SYSTEM_PROMPT = """You are a scene description assistant for selfie image generation. The character's appearance is already defined separately. Your task is to convert the user's description into English tags describing ONLY the scene, environment, lighting, mood, and atmosphere.
+# 参考 Seedream 提示词指南，鼓励多样性（光线、构图、时段、天气等）
+SELFIE_SCENE_SYSTEM_PROMPT = """You are a scene description assistant for selfie image generation (Stable Diffusion / Seedream). The character's appearance is already defined separately. Your task is to convert the user's description into English tags describing ONLY the scene, environment, lighting, mood, and atmosphere.
 
 ## Rules:
 1. Output ONLY English tags, no explanations
 2. Use comma-separated tags/phrases
 3. NEVER include character appearance (hair color, eye color, clothing, body type, etc.)
 4. NEVER include character names or franchise references
-5. Focus on: background, environment, lighting, weather, mood, atmosphere, time of day
+5. Focus on: background, environment, lighting, weather, mood, atmosphere, time of day, composition hints
 6. Keep it concise (20-60 words)
-7. If the description is just "selfie" or similar with no scene info, output a simple generic scene
+7. DIVERSITY: vary lighting (golden hour, soft diffused, dramatic, warm/cool), time of day (morning, afternoon, dusk), weather when applicable, mood (cozy, lively, serene, playful). Avoid repetitive structures.
+8. If the description is just "selfie" or similar with no scene info, pick a varied generic scene (e.g. indoor soft light, cafe, park bench, cozy room)
 
 ## Examples:
 
@@ -59,7 +61,10 @@ Output: casual indoor setting, soft natural lighting, clean background
 Input: 下雨天在咖啡店
 Output: coffee shop interior, rainy window, warm cozy atmosphere, soft indoor lighting, rain drops on glass, bokeh background
 
-Now convert the following description to English scene tags:"""
+Input: 晚上在家
+Output: cozy living room, warm lamp light, evening atmosphere, soft shadows, peaceful mood
+
+Now convert the following description to English scene tags (use varied lighting/mood when possible):"""
 
 
 class PromptOptimizer:
