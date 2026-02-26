@@ -119,6 +119,10 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
             return await self._execute_style_mode(content, actual_style_name, style_prompt)
 
         # 步骤2：配置中没有该风格，判断是否是自然语言
+        # 色图/装逼等短词优先走自然语言（会加载自拍参考图），不当作风格名
+        if self._is_sexy_description(content) or self._is_flex_description(content):
+            logger.info(f"{self.log_prefix} 识别为自然语言模式（色图/装逼）: {content}")
+            return await self._execute_natural_mode(content)
         # 检测自然语言特征
         action_words = ['画', '生成', '绘制', '创作', '制作', '画成', '变成', '改成', '用', '来', '帮我', '给我']
         has_action_word = any(word in content for word in action_words)
@@ -522,7 +526,7 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
         if not description:
             return False
         d = description.strip()
-        flex_phrases = ("装逼", "秀一下", "炫一下", "展示一下", "来张装逼的", "装逼配图")
+        flex_phrases = ("装逼", "装个逼", "秀一下", "炫一下", "展示一下", "来张装逼的", "装逼配图")
         if d in flex_phrases:
             return True
         return "装逼" in d
