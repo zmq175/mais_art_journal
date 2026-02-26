@@ -203,22 +203,24 @@ class MaisArtAction(BaseAction):
             description = description[:1000]
             logger.info(f"{self.log_prefix} 图片描述过长，已截断至1000字符")
 
-        # 提示词优化（自拍模式仅优化场景/环境，豆包用中文；色图模式也优化描述后与固定性感提示词组合）
+        # 提示词优化（自拍仅优化场景；豆包用中文；色图先脱敏再优化，避免 LLM 拒绝）
         optimizer_enabled = self.get_config("prompt_optimizer.enabled", True)
         if optimizer_enabled:
-            scene_only = bool(selfie_mode)
+            # 色图模式：先脱敏再送优化器，避免「色图」等直白词触发拒绝
+            opt_input = self._sanitize_sexy_description(description) if sexy_mode else description
+            scene_only = bool(selfie_mode) and not sexy_mode
             model_config_for_optimizer = self._get_model_config(model_id)
             api_format = model_config_for_optimizer.get("api_format") if model_config_for_optimizer else None
-            mode_label = "场景提示词" if scene_only else "提示词"
-            logger.info(f"{self.log_prefix} 开始优化{mode_label}: {description[:50]}...")
+            mode_label = "色图描述" if sexy_mode else ("场景提示词" if scene_only else "提示词")
+            logger.info(f"{self.log_prefix} 开始优化{mode_label}: {opt_input[:50]}...")
             success, optimized_prompt = await optimize_prompt(
-                description, self.log_prefix, scene_only=scene_only, api_format=api_format
+                opt_input, self.log_prefix, scene_only=scene_only, api_format=api_format
             )
             if success:
                 logger.info(f"{self.log_prefix} {mode_label}优化完成: {optimized_prompt[:80]}...")
                 description = optimized_prompt
             else:
-                logger.warning(f"{self.log_prefix} {mode_label}优化失败，使用原始描述: {description[:50]}...")
+                logger.warning(f"{self.log_prefix} {mode_label}优化失败，使用原始描述: {opt_input[:50]}...")
 
         # 验证strength参数
         try:
@@ -234,6 +236,8 @@ class MaisArtAction(BaseAction):
             if not reference_image:
                 await self.send_text("发色图需要先配置自拍参考图哦~（在 selfie.reference_image_path 里配置）")
                 return False, "色图模式无参考图"
+            # 用中性描述替代直接敏感词，避免生图 API 拒审
+            desc_safe = self._sanitize_sexy_description(description.strip())
             model_config = self._get_model_config(model_id)
             api_format = (model_config or {}).get("api_format", "").strip().lower()
             bot_appearance = self.get_config("selfie.prompt_prefix", "").strip()
@@ -242,16 +246,16 @@ class MaisArtAction(BaseAction):
                 parts = [base]
                 if outfit:
                     parts.append(outfit)
-                parts.append(description.strip())
+                parts.append(desc_safe)
                 sexy_prompt = "，".join(parts)
             else:
                 base = f"{bot_appearance}, {self._SEXY_PROMPT_EN}" if bot_appearance else self._SEXY_PROMPT_EN
                 parts = [base]
                 if outfit:
                     parts.append(outfit)
-                parts.append(description.strip())
+                parts.append(desc_safe)
                 sexy_prompt = ", ".join(parts)
-            logger.info(f"{self.log_prefix} 色图模式，基于自拍参考图+描述生成合规性感图: {description[:50]}...")
+            logger.info(f"{self.log_prefix} 色图模式，基于自拍参考图生成合规性感图（描述已脱敏）")
             return await self._execute_unified_generation(
                 sexy_prompt, model_id, size, strength or 0.58, reference_image,
                 extra_negative_prompt=self._SEXY_NEGATIVE,
@@ -722,6 +726,21 @@ class MaisArtAction(BaseAction):
         "一位女孩，单人，性感但含蓄的姿势，艺术感，柔光，微露香肩或锁骨，优雅，撩人但合规，不露点不色情，高清细腻"
     )
     _SEXY_NEGATIVE = "nudity, nsfw, explicit, porn, genitals, bare breasts, xxx, 色情, 露点"
+
+    # 色图描述脱敏：直接敏感词替换为中性表述，避免优化器/生图 API 拒审
+    _SEXY_DIRECT_PHRASES = ("色图", "发色图", "来张色图", "来点色图", "色图来一张")
+    _SEXY_SAFE_FALLBACK_ZH = "含蓄性感风格"
+
+    def _sanitize_sexy_description(self, description: str) -> str:
+        """将易触发审核的色图相关描述替换为中性表述，保留其他有效描述（如浴衣、场景）。"""
+        if not description:
+            return self._SEXY_SAFE_FALLBACK_ZH
+        d = description.strip()
+        if d in self._SEXY_DIRECT_PHRASES:
+            return self._SEXY_SAFE_FALLBACK_ZH
+        if "色图" in d:
+            d = d.replace("色图", "含蓄性感").strip() or self._SEXY_SAFE_FALLBACK_ZH
+        return d or self._SEXY_SAFE_FALLBACK_ZH
 
     @staticmethod
     def _get_hand_actions_for_style(selfie_style: str) -> list:

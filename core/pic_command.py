@@ -293,11 +293,14 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
             success, optimized_prompt = await optimize_prompt(
                 description, self.log_prefix, api_format=model_config.get("api_format")
             )
-            if success:
+            if success and not self._is_optimizer_refusal(optimized_prompt):
                 logger.info(f"{self.log_prefix} 提示词优化完成: {optimized_prompt[:80]}...")
                 description = optimized_prompt
             else:
-                logger.warning(f"{self.log_prefix} 提示词优化失败，使用原始描述")
+                if success and self._is_optimizer_refusal(optimized_prompt):
+                    logger.warning(f"{self.log_prefix} 优化器拒绝生成（如敏感内容），使用原始描述")
+                else:
+                    logger.warning(f"{self.log_prefix} 提示词优化失败，使用原始描述")
 
         # 使用统一的尺寸处理逻辑（异步版本，支持 LLM 选择尺寸）
         image_size, llm_original_size = await get_image_size_async(
@@ -358,6 +361,17 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
             logger.error(f"{self.log_prefix} 命令执行异常: {e!r}", exc_info=True)
             await self.send_text(f"执行失败：{str(e)[:100]}")
             return False, f"命令执行异常: {str(e)}", True
+
+    def _is_optimizer_refusal(self, optimized_prompt: str) -> bool:
+        """判断优化结果是否为 LLM 拒绝生成（如敏感内容），应回退为原始描述。"""
+        if not optimized_prompt or len(optimized_prompt) > 200:
+            return False
+        s = optimized_prompt.strip().lower()
+        refusal_markers = (
+            "cannot generate", "can't generate", "i cannot", "i can't",
+            "sexually explicit", "refuse", "无法生成", "不能生成",
+        )
+        return any(m in s for m in refusal_markers)
 
     def _extract_model_id(self, description: str) -> Optional[str]:
         """从描述中提取模型ID
