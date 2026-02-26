@@ -24,7 +24,7 @@ from .schedule_provider import get_schedule_provider
 from .scene_action_generator import convert_to_selfie_prompt, get_negative_prompt_for_style
 from .caption_generator import generate_caption
 from ..api_clients import generate_image_standalone
-from ..utils import get_model_config, is_in_time_range
+from ..utils import get_model_config, is_in_time_range, optimize_prompt
 
 logger = get_logger("auto_selfie.task")
 
@@ -147,6 +147,18 @@ class AutoSelfieTask:
         if not model_config:
             logger.error(f"模型配置获取失败: {selfie_model}")
             return
+
+        # 豆包格式使用中文自然语言提示词（与 pic_action 一致）
+        if model_config.get("api_format", "").strip().lower() == "doubao":
+            success_opt, chinese_prompt = await optimize_prompt(
+                prompt,
+                log_prefix="[auto_selfie.task]",
+                scene_only=False,
+                api_format="doubao",
+            )
+            if success_opt and chinese_prompt:
+                prompt = chinese_prompt
+                logger.info(f"自拍提示词已转为中文: {prompt[:80]}...")
 
         # 透传代理配置
         extra_config = {}
