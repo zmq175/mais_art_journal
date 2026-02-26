@@ -1,3 +1,5 @@
+import base64
+import os
 import re
 import time as time_module
 from typing import Tuple, Optional, Dict, Any
@@ -6,10 +8,11 @@ from src.plugin_system.base.base_command import BaseCommand
 from src.common.logger import get_logger
 
 from .api_clients import ApiClient
+from .pic_action import MaisArtAction
 from .utils import (
     ImageProcessor, runtime_state, optimize_prompt, get_image_size_async,
-    get_model_config, inject_llm_original_size, resolve_image_data,
-    schedule_auto_recall,
+    get_model_config, inject_llm_original_size, merge_negative_prompt,
+    resolve_image_data, schedule_auto_recall,
 )
 
 logger = get_logger("mais_art.command")
@@ -268,6 +271,73 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
         # 检查是否启用调试信息
         enable_debug = self.get_config("components.enable_debug_info", False)
 
+        # 色图：/dr 来张色图 等走自拍参考图 + 合规性感提示词（与 Action 一致）
+        if self._is_sexy_description(description):
+            reference_image = self._load_selfie_reference_image()
+            if reference_image and model_config.get("support_img2img", True):
+                desc_safe = MaisArtAction._sanitize_sexy_description(description)
+                # 色图也走一次优化（送脱敏描述，避免拒绝）
+                optimizer_enabled = self.get_config("prompt_optimizer.enabled", True)
+                if optimizer_enabled:
+                    success_opt, optimized = await optimize_prompt(
+                        desc_safe, self.log_prefix, api_format=model_config.get("api_format")
+                    )
+                    if success_opt and optimized and not self._is_optimizer_refusal(optimized):
+                        desc_safe = optimized
+                api_format = (model_config.get("api_format") or "").strip().lower()
+                bot_appearance = self.get_config("selfie.prompt_prefix", "").strip()
+                if api_format == "doubao":
+                    base = f"{bot_appearance}，{MaisArtAction._SEXY_PROMPT_ZH}" if bot_appearance else MaisArtAction._SEXY_PROMPT_ZH
+                    sexy_prompt = f"{base}，{desc_safe}"
+                else:
+                    base = f"{bot_appearance}, {MaisArtAction._SEXY_PROMPT_EN}" if bot_appearance else MaisArtAction._SEXY_PROMPT_EN
+                    sexy_prompt = f"{base}, {desc_safe}"
+                model_config = merge_negative_prompt(model_config, MaisArtAction._SEXY_NEGATIVE)
+                image_size, _ = await get_image_size_async(model_config, sexy_prompt, None, self.log_prefix)
+                model_config = inject_llm_original_size(model_config, None)
+                try:
+                    api_client = ApiClient(self)
+                    success, result = await api_client.generate_image(
+                        prompt=sexy_prompt,
+                        model_config=model_config,
+                        size=image_size,
+                        strength=0.58,
+                        input_image_base64=reference_image,
+                        max_retries=self.get_config("components.max_retries", 2),
+                    )
+                    if success:
+                        final_image_data = self.image_processor.process_api_response(result)
+                        if final_image_data:
+                            resolved_ok, resolved_data = await resolve_image_data(
+                                final_image_data, self._download_and_encode_base64, self.log_prefix
+                            )
+                            if resolved_ok:
+                                send_success = await self.send_image(resolved_data)
+                                if send_success:
+                                    if enable_debug:
+                                        await self.send_text("色图生成完成！")
+                                    await self._schedule_auto_recall_for_recent_message(model_config, model_id, time_module.time())
+                                    return True, "色图命令执行成功", True
+                                else:
+                                    await self.send_text("图片发送失败")
+                                    return False, "图片发送失败", True
+                            else:
+                                await self.send_text(f"图片处理失败：{resolved_data}")
+                                return False, f"图片处理失败: {resolved_data}", True
+                        else:
+                            await self.send_text("API返回数据格式错误")
+                            return False, "API返回数据格式错误", True
+                    else:
+                        await self.send_text(f"色图生成失败：{result}")
+                        return False, f"色图生成失败: {result}", True
+                except Exception as e:
+                    logger.error(f"{self.log_prefix} 色图命令异常: {e!r}", exc_info=True)
+                    await self.send_text(f"执行失败：{str(e)[:100]}")
+                    return False, str(e), True
+            elif not reference_image:
+                await self.send_text("发色图需要先配置自拍参考图哦~（selfie.reference_image_path）")
+                return False, "色图模式无参考图", True
+
         # 智能检测：判断是文生图还是图生图
         input_image_base64 = await self.image_processor.get_recent_image()
         is_img2img_mode = input_image_base64 is not None
@@ -372,6 +442,43 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
             "sexually explicit", "refuse", "无法生成", "不能生成",
         )
         return any(m in s for m in refusal_markers)
+
+    def _is_sexy_description(self, description: str) -> bool:
+        """判断是否为色图类描述，应走自拍参考图 + 合规性感提示词。"""
+        if not description:
+            return False
+        d = description.strip()
+        if d in MaisArtAction._SEXY_DIRECT_PHRASES:
+            return True
+        return "色图" in d
+
+    def _load_selfie_reference_image(self) -> Optional[str]:
+        """加载自拍参考图 base64（与 pic_action 一致，支持多路径随机选一）。"""
+        import random
+        raw = self.get_config("selfie.reference_image_path", "").strip()
+        if not raw:
+            return None
+        paths = [p.strip() for p in raw.split(",") if p.strip()]
+        if not paths:
+            return None
+        plugin_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        existing = []
+        for p in paths:
+            full = p if os.path.isabs(p) else os.path.join(plugin_dir, p)
+            if os.path.exists(full):
+                existing.append(full)
+        if not existing:
+            logger.warning(f"{self.log_prefix} 自拍参考图片均不存在: {paths}")
+            return None
+        image_path = random.choice(existing)
+        try:
+            with open(image_path, "rb") as f:
+                image_base64 = base64.b64encode(f.read()).decode("utf-8")
+            logger.info(f"{self.log_prefix} 色图模式加载自拍参考图: {image_path}")
+            return image_base64
+        except Exception as e:
+            logger.error(f"{self.log_prefix} 加载自拍参考图失败: {e}")
+        return None
 
     def _extract_model_id(self, description: str) -> Optional[str]:
         """从描述中提取模型ID

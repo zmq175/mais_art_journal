@@ -731,16 +731,17 @@ class MaisArtAction(BaseAction):
     _SEXY_DIRECT_PHRASES = ("色图", "发色图", "来张色图", "来点色图", "色图来一张")
     _SEXY_SAFE_FALLBACK_ZH = "含蓄性感风格"
 
-    def _sanitize_sexy_description(self, description: str) -> str:
+    @staticmethod
+    def _sanitize_sexy_description(description: str) -> str:
         """将易触发审核的色图相关描述替换为中性表述，保留其他有效描述（如浴衣、场景）。"""
         if not description:
-            return self._SEXY_SAFE_FALLBACK_ZH
+            return MaisArtAction._SEXY_SAFE_FALLBACK_ZH
         d = description.strip()
-        if d in self._SEXY_DIRECT_PHRASES:
-            return self._SEXY_SAFE_FALLBACK_ZH
+        if d in MaisArtAction._SEXY_DIRECT_PHRASES:
+            return MaisArtAction._SEXY_SAFE_FALLBACK_ZH
         if "色图" in d:
-            d = d.replace("色图", "含蓄性感").strip() or self._SEXY_SAFE_FALLBACK_ZH
-        return d or self._SEXY_SAFE_FALLBACK_ZH
+            d = d.replace("色图", "含蓄性感").strip() or MaisArtAction._SEXY_SAFE_FALLBACK_ZH
+        return d or MaisArtAction._SEXY_SAFE_FALLBACK_ZH
 
     @staticmethod
     def _get_hand_actions_for_style(selfie_style: str) -> list:
