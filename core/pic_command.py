@@ -338,6 +338,71 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
                 await self.send_text("发色图需要先配置自拍参考图哦~（selfie.reference_image_path）")
                 return False, "色图模式无参考图", True
 
+        # 装逼配图：/dr 装逼、秀一下 等走自拍参考图 + 装逼风格提示词（与 Action 一致）
+        if self._is_flex_description(description):
+            reference_image = self._load_selfie_reference_image()
+            if reference_image and model_config.get("support_img2img", True):
+                desc = description.strip() or "装逼配图"
+                optimizer_enabled = self.get_config("prompt_optimizer.enabled", True)
+                if optimizer_enabled:
+                    success_opt, optimized = await optimize_prompt(
+                        desc, self.log_prefix, api_format=model_config.get("api_format")
+                    )
+                    if success_opt and optimized and not self._is_optimizer_refusal(optimized):
+                        desc = optimized
+                api_format = (model_config.get("api_format") or "").strip().lower()
+                bot_appearance = self.get_config("selfie.prompt_prefix", "").strip()
+                if api_format == "doubao":
+                    base = f"{bot_appearance}，{MaisArtAction._FLEX_PROMPT_ZH}" if bot_appearance else MaisArtAction._FLEX_PROMPT_ZH
+                    flex_prompt = f"{base}，{desc}"
+                else:
+                    base = f"{bot_appearance}, {MaisArtAction._FLEX_PROMPT_EN}" if bot_appearance else MaisArtAction._FLEX_PROMPT_EN
+                    flex_prompt = f"{base}, {desc}"
+                image_size, _ = await get_image_size_async(model_config, flex_prompt, None, self.log_prefix)
+                model_config = inject_llm_original_size(model_config, None)
+                try:
+                    api_client = ApiClient(self)
+                    success, result = await api_client.generate_image(
+                        prompt=flex_prompt,
+                        model_config=model_config,
+                        size=image_size,
+                        strength=0.55,
+                        input_image_base64=reference_image,
+                        max_retries=self.get_config("components.max_retries", 2),
+                    )
+                    if success:
+                        final_image_data = self.image_processor.process_api_response(result)
+                        if final_image_data:
+                            resolved_ok, resolved_data = await resolve_image_data(
+                                final_image_data, self._download_and_encode_base64, self.log_prefix
+                            )
+                            if resolved_ok:
+                                send_success = await self.send_image(resolved_data)
+                                if send_success:
+                                    if enable_debug:
+                                        await self.send_text("装逼配图完成！")
+                                    await self._schedule_auto_recall_for_recent_message(model_config, model_id, time_module.time())
+                                    return True, "装逼配图命令执行成功", True
+                                else:
+                                    await self.send_text("图片发送失败")
+                                    return False, "图片发送失败", True
+                            else:
+                                await self.send_text(f"图片处理失败：{resolved_data}")
+                                return False, f"图片处理失败: {resolved_data}", True
+                        else:
+                            await self.send_text("API返回数据格式错误")
+                            return False, "API返回数据格式错误", True
+                    else:
+                        await self.send_text(f"装逼配图失败：{result}")
+                        return False, f"装逼配图失败: {result}", True
+                except Exception as e:
+                    logger.error(f"{self.log_prefix} 装逼配图命令异常: {e!r}", exc_info=True)
+                    await self.send_text(f"执行失败：{str(e)[:100]}")
+                    return False, str(e), True
+            elif not reference_image:
+                await self.send_text("装逼配图需要先配置自拍参考图哦~（selfie.reference_image_path）")
+                return False, "装逼模式无参考图", True
+
         # 智能检测：判断是文生图还是图生图
         input_image_base64 = await self.image_processor.get_recent_image()
         is_img2img_mode = input_image_base64 is not None
@@ -451,6 +516,16 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
         if d in MaisArtAction._SEXY_DIRECT_PHRASES:
             return True
         return "色图" in d
+
+    def _is_flex_description(self, description: str) -> bool:
+        """判断是否为装逼配图类描述，应走自拍参考图 + 装逼风格提示词。"""
+        if not description:
+            return False
+        d = description.strip()
+        flex_phrases = ("装逼", "秀一下", "炫一下", "展示一下", "来张装逼的", "装逼配图")
+        if d in flex_phrases:
+            return True
+        return "装逼" in d
 
     def _load_selfie_reference_image(self) -> Optional[str]:
         """加载自拍参考图 base64（与 pic_action 一致，支持多路径随机选一）。"""

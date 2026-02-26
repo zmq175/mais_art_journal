@@ -48,14 +48,16 @@ class MaisArtAction(BaseAction):
         "自拍", "selfie", "拍照", "对镜自拍", "镜子自拍", "照镜子", "发照片", "来张照片",
         "拍一张", "发张图", "看看你", "想看你", "来张自拍", "给张自拍", "现在的样子",
         # 色图关键词（基于自拍参考图生成合规性感图）
-        "色图", "发色图", "来张色图", "来点色图", "色图来一张"
+        "色图", "发色图", "来张色图", "来点色图", "色图来一张",
+        # 装逼配图（基于自拍参考图生成装逼风格图）
+        "装逼", "秀一下", "炫一下", "展示一下", "来张装逼的", "装逼配图"
     ]
 
     # LLM判定提示词（用于Focus模式）
     ALWAYS_prompt = """
 判定是否需要使用图片生成动作的条件：
 
-**核心原则：只有在用户明确对你提出画图请求时才使用。在群聊中，必须是用户@你或点名叫你来画图。**
+**核心原则：** 既可以响应用户的画图请求，也可以在合适时机主动发图（自拍、雌竞、反击、色图、装逼等）。群聊里普通「画一张xxx」建议在用户@你或点名时再画；自拍/雌竞/反击/色图/装逼等场景可以更主动，不必等@。
 
 **文生图场景：**
 1. 用户明确@你的名字或叫你的名字，要求画图、生成图片或创作图像
@@ -74,7 +76,8 @@ class MaisArtAction(BaseAction):
 6. **雌竞倾向**：当对话涉及其他人、其他女生、或用户对他人表示兴趣/夸奖时，你会有想争取注意、展现自己的冲动——此时可以主动选择发自拍，用自拍来"抢回"关注、证明自己更好看
 7. **反击倾向**：当你被攻击、吐槽、贬低、嘲讽（如说你丑、不好看、比不上别人、不行等）时，你有不服输的一面，可以主动发自拍回击——用自拍证明自己好看、打脸对方
 8. **色图场景**：当用户明确要色图（如「发色图」「来张色图」）、或大家讨论内容适合发色图时，使用 sexy_mode=true。基于自拍参考图生成合规性感图，不需要暧昧；无参考图时不要选此动作。
-9. **服装设计**：由你根据场景、氛围或用户意图设计角色穿什么（可填入 outfit 或在 description 中体现），如浴衣、吊带裙、睡衣、卫衣、制服、汉服等，使画面更丰富。
+9. **装逼配图场景**：当聊天内容适合装逼并配图时（如炫耀、秀一下、展示成果、得意时刻、装逼等），使用 flex_mode=true。基于自拍参考图生成参考图里的人物在装逼/炫耀的图片，description 可写装逼的由头或场景（如「刚考完」「买了新包」）。
+10. **服装设计**：由你根据场景、氛围或用户意图设计角色穿什么（可填入 outfit 或在 description 中体现），如浴衣、吊带裙、睡衣、卫衣、制服、汉服等，使画面更丰富。
 
 **绝对不要使用的情况：**（自拍场景如雌竞/反击/想看你等优先考虑，以下规则可放宽）
 1. 其他机器人的命令（如/nai、/sd、/mj等），这些是发给其他机器人的
@@ -94,6 +97,7 @@ class MaisArtAction(BaseAction):
         "selfie_style": "自拍风格，可选值：standard（标准自拍，前置摄像头视角），mirror（对镜自拍，室内镜子场景），photo（第三人称照片，他人拍摄视角，自然姿态）。仅在selfie_mode=true时生效，可选，默认standard",
         "free_hand_action": "自由手部动作描述（英文）。如果指定此参数，将使用此动作而不是随机生成。仅在selfie_mode=true时生效，可选",
         "sexy_mode": "是否发色图（true/false，可选，默认false）。当大家讨论适合发色图或用户明确要色图时设为true，基于自拍参考图生成合规性感图，不需暧昧",
+        "flex_mode": "是否装逼配图（true/false，可选，默认false）。当聊天适合装逼并配图时（炫耀、秀一下、展示、得意等）设为true，基于自拍参考图生成该人物装逼/炫耀风格的图",
         "outfit": "服装描述（可选）。由你根据场景、氛围或用户意图设计角色穿什么，如浴衣、吊带裙、睡衣、卫衣、制服、汉服等，使画面更丰富。不填则可在 description 中体现"
     }
 
@@ -109,6 +113,7 @@ class MaisArtAction(BaseAction):
         "雌竞倾向：当用户提到/夸奖其他人、其他女生，或对他人表示兴趣时，你有争强好胜的一面，愿意主动发自拍来争取注意、展现自己更好看，不必等用户明确要求",
         "反击倾向：当你被攻击、吐槽、贬低、嘲讽时（如说你丑、不好看、不行等），你有不服输的一面，愿意主动发自拍回击，用自拍证明自己",
         "色图：当用户要色图或讨论内容适合发色图时，使用 sexy_mode=true，基于自拍参考图生成合规性感图；无自拍参考图配置时不要选色图",
+        "装逼配图：当聊天适合装逼并配图时（炫耀、秀一下、展示、得意等）使用 flex_mode=true，基于自拍参考图生成装逼风格图；description 可写由头或场景",
         "服装：根据场景与用户意图由你设计角色穿着，可填入 outfit（如浴衣、吊带、睡衣、卫衣、制服等）或写在 description 中，增加画面多样性"
     ]
     associated_types = ["text", "image"]
@@ -161,6 +166,8 @@ class MaisArtAction(BaseAction):
         selfie_mode = selfie_mode_raw in (True, "true", "True", 1, "1")
         sexy_mode_raw = self.action_data.get("sexy_mode", False)
         sexy_mode = sexy_mode_raw in (True, "true", "True", 1, "1")
+        flex_mode_raw = self.action_data.get("flex_mode", False)
+        flex_mode = flex_mode_raw in (True, "true", "True", 1, "1")
         selfie_style_llm = self.action_data.get("selfie_style", "").strip().lower()
         free_hand_action = self.action_data.get("free_hand_action", "").strip()
         outfit = self.action_data.get("outfit", "").strip()
@@ -186,17 +193,20 @@ class MaisArtAction(BaseAction):
             await self.send_text(f"模型 {model_id} 当前不可用")
             return False, f"模型 {model_id} 已禁用"
 
-        # 参数验证和后备提取（色图模式也需要描述，用于与固定性感提示词组合）
-        if not description:
+        # 参数验证和后备提取（色图/装逼模式也需要描述用于组合提示词）
+        if not description and not flex_mode:
             # 尝试从action_message中提取描述
             extracted_description = self._extract_description_from_message()
             if extracted_description:
                 description = extracted_description
                 logger.info(f"{self.log_prefix} 从消息中提取到图片描述: {description}")
             else:
-                logger.warning(f"{self.log_prefix} 图片描述为空，无法生成图片。")
-                await self.send_text("你需要告诉我想要画什么样的图片哦~ 比如说'画一只可爱的小猫'")
-                return False, "图片描述为空"
+                if flex_mode:
+                    description = "装逼配图"
+                else:
+                    logger.warning(f"{self.log_prefix} 图片描述为空，无法生成图片。")
+                    await self.send_text("你需要告诉我想要画什么样的图片哦~ 比如说'画一只可爱的小猫'")
+                    return False, "图片描述为空"
 
         # 清理和验证描述
         if len(description) > 1000:
@@ -206,12 +216,12 @@ class MaisArtAction(BaseAction):
         # 提示词优化（自拍仅优化场景；豆包用中文；色图先脱敏再优化，避免 LLM 拒绝）
         optimizer_enabled = self.get_config("prompt_optimizer.enabled", True)
         if optimizer_enabled:
-            # 色图模式：先脱敏再送优化器，避免「色图」等直白词触发拒绝
+            # 色图模式：先脱敏再送优化器；装逼模式也优化描述
             opt_input = self._sanitize_sexy_description(description) if sexy_mode else description
-            scene_only = bool(selfie_mode) and not sexy_mode
+            scene_only = bool(selfie_mode) and not sexy_mode and not flex_mode
             model_config_for_optimizer = self._get_model_config(model_id)
             api_format = model_config_for_optimizer.get("api_format") if model_config_for_optimizer else None
-            mode_label = "色图描述" if sexy_mode else ("场景提示词" if scene_only else "提示词")
+            mode_label = "色图描述" if sexy_mode else ("装逼描述" if flex_mode else ("场景提示词" if scene_only else "提示词"))
             logger.info(f"{self.log_prefix} 开始优化{mode_label}: {opt_input[:50]}...")
             success, optimized_prompt = await optimize_prompt(
                 opt_input, self.log_prefix, scene_only=scene_only, api_format=api_format
@@ -259,6 +269,34 @@ class MaisArtAction(BaseAction):
             return await self._execute_unified_generation(
                 sexy_prompt, model_id, size, strength or 0.58, reference_image,
                 extra_negative_prompt=self._SEXY_NEGATIVE,
+            )
+
+        # 装逼配图：基于自拍参考图生成该人物装逼/炫耀风格图
+        if flex_mode:
+            reference_image = self._get_selfie_reference_image()
+            if not reference_image:
+                await self.send_text("装逼配图需要先配置自拍参考图哦~（在 selfie.reference_image_path 里配置）")
+                return False, "装逼模式无参考图"
+            model_config = self._get_model_config(model_id)
+            api_format = (model_config or {}).get("api_format", "").strip().lower()
+            bot_appearance = self.get_config("selfie.prompt_prefix", "").strip()
+            if api_format == "doubao":
+                base = f"{bot_appearance}，{self._FLEX_PROMPT_ZH}" if bot_appearance else self._FLEX_PROMPT_ZH
+                parts = [base]
+                if outfit:
+                    parts.append(outfit)
+                parts.append(description.strip())
+                flex_prompt = "，".join(parts)
+            else:
+                base = f"{bot_appearance}, {self._FLEX_PROMPT_EN}" if bot_appearance else self._FLEX_PROMPT_EN
+                parts = [base]
+                if outfit:
+                    parts.append(outfit)
+                parts.append(description.strip())
+                flex_prompt = ", ".join(parts)
+            logger.info(f"{self.log_prefix} 装逼模式，基于自拍参考图生成装逼风格图")
+            return await self._execute_unified_generation(
+                flex_prompt, model_id, size, strength or 0.55, reference_image,
             )
 
         # 处理自拍模式
@@ -726,6 +764,15 @@ class MaisArtAction(BaseAction):
         "一位女孩，单人，性感但含蓄的姿势，艺术感，柔光，微露香肩或锁骨，优雅，撩人但合规，不露点不色情，高清细腻"
     )
     _SEXY_NEGATIVE = "nudity, nsfw, explicit, porn, genitals, bare breasts, xxx, 色情, 露点"
+
+    # 装逼配图：自信/炫耀感提示词（基于自拍参考图）
+    _FLEX_PROMPT_EN = (
+        "1girl, solo, confident pose, showing off, proud expression, flexing, "
+        "stylish, looking at camera, triumphant mood, masterpiece, best quality, high resolution"
+    )
+    _FLEX_PROMPT_ZH = (
+        "一位女孩，单人，自信姿势，得意表情，装逼/炫耀感，配合场景，看着镜头，氛围得意，高清细腻"
+    )
 
     # 色图描述脱敏：直接敏感词替换为中性表述，避免优化器/生图 API 拒审
     _SEXY_DIRECT_PHRASES = ("色图", "发色图", "来张色图", "来点色图", "色图来一张")
