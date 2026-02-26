@@ -66,6 +66,55 @@ Output: cozy living room, warm lamp light, evening atmosphere, soft shadows, pea
 
 Now convert the following description to English scene tags (use varied lighting/mood when possible):"""
 
+# 豆包（火山方舟 Seedream）专用：中文自然语言提示词
+# 参考：https://www.volcengine.com/docs/82379/1666946 支持中英文，建议不超过300汉字
+OPTIMIZER_SYSTEM_PROMPT_DOUBAO = """你是一名专业的图像生成提示词助手，面向火山方舟豆包 Seedream 模型。请将用户的描述改写成一段简洁、画面感强的中文自然语言提示词，直接用于文生图/图生图。
+
+## 要求：
+1. 只输出中文提示词本身，不要解释、不要翻译成英文、不要加“提示词：”等前缀
+2. 使用自然、通顺的中文句子或短语，描述画面内容（主体、动作、场景、光线、氛围、风格）
+3. 建议 50–150 字，不超过 300 字，避免堆砌无关词
+4. 不要使用英文 tag、不要用括号权重语法
+5. 可适当补充画面细节（如光影、色调、构图感），使生成效果更稳定
+
+## 示例：
+
+输入：海边的女孩
+输出：一位女孩站在海边，身后是海浪与夕阳，天空有橙粉色的云，穿着夏装，头发被风吹起，表情宁静，画面温暖柔和，高清细腻
+
+输入：可爱的猫咪睡觉
+输出：一只可爱的猫咪蜷缩在柔软的毯子上睡觉，毛发蓬松，闭着眼睛，室内暖光，氛围温馨宁静，细节清晰
+
+输入：赛博朋克城市
+输出：赛博朋克风格的城市街景，霓虹灯闪烁，未来感建筑，飞车与雨夜，地面反光，紫蓝色调，电影感氛围
+
+请将以下用户描述改写成中文自然语言提示词："""
+
+# 豆包自拍场景专用：仅场景/环境/光线/氛围，中文自然语言
+SELFIE_SCENE_SYSTEM_PROMPT_DOUBAO = """你是自拍图像生成的场景描述助手，面向豆包 Seedream。角色外观已单独定义，你只需把用户描述改写成仅包含场景、环境、光线、氛围的中文自然语言，供图生图使用。
+
+## 要求：
+1. 只输出中文描述本身，不要解释或前缀
+2. 不要包含角色外貌（发型、衣着、体型等）和角色名
+3. 只写：背景、环境、光线、天气、氛围、时间感、构图感等
+4. 20–80 字，自然通顺，可适当变化光线与氛围（如黄昏、室内柔光、咖啡店、雨天等）
+
+## 示例：
+
+输入：在海边自拍
+输出：海边背景，海浪与沙滩，黄昏暖光，微风，夏日氛围
+
+输入：图书馆学习
+输出：图书馆内景，书架与书桌，暖色环境光，安静氛围，背景略虚化
+
+输入：来张自拍
+输出：室内日常场景，柔和自然光，简洁背景
+
+输入：下雨天在咖啡店
+输出：咖啡店内，窗外雨景，暖黄灯光，雨滴落在玻璃上，氛围温馨
+
+请将以下描述改写成仅含场景与氛围的中文提示词："""
+
 
 class PromptOptimizer:
     """提示词优化器
@@ -93,12 +142,13 @@ class PromptOptimizer:
                 return None
         return self._model_config
 
-    async def optimize(self, user_description: str, scene_only: bool = False) -> Tuple[bool, str]:
+    async def optimize(self, user_description: str, scene_only: bool = False, api_format: str = None) -> Tuple[bool, str]:
         """优化用户描述为专业绘画提示词
 
         Args:
             user_description: 用户原始描述（中文或英文）
             scene_only: 仅生成场景/环境描述（自拍模式用，不包含角色外观）
+            api_format: 生图 API 格式，如 "doubao" 时使用中文自然语言提示词（火山方舟 Seedream）
 
         Returns:
             Tuple[bool, str]: (是否成功, 优化后的提示词或错误信息)
@@ -113,14 +163,19 @@ class PromptOptimizer:
             return True, user_description
 
         try:
-            # 根据模式选择系统提示词
-            system_prompt = SELFIE_SCENE_SYSTEM_PROMPT if scene_only else OPTIMIZER_SYSTEM_PROMPT
+            # 豆包格式使用中文自然语言提示词（火山方舟 Seedream 支持中英文，效果更自然）
+            use_doubao_style = (api_format or "").strip().lower() == "doubao"
+            if scene_only:
+                system_prompt = SELFIE_SCENE_SYSTEM_PROMPT_DOUBAO if use_doubao_style else SELFIE_SCENE_SYSTEM_PROMPT
+            else:
+                system_prompt = OPTIMIZER_SYSTEM_PROMPT_DOUBAO if use_doubao_style else OPTIMIZER_SYSTEM_PROMPT
 
             # 构建完整 prompt
             full_prompt = f"{system_prompt}\n\nInput: {user_description.strip()}\nOutput:"
 
             mode_label = "场景提示词" if scene_only else "提示词"
-            logger.info(f"{self.log_prefix} 开始优化{mode_label}: {user_description[:50]}...")
+            style_label = "中文自然语言(豆包)" if use_doubao_style else "英文 tag"
+            logger.info(f"{self.log_prefix} 开始优化{mode_label} ({style_label}): {user_description[:50]}...")
 
             # 调用 LLM（不传递 temperature 和 max_tokens，使用模型默认值）
             success, response, reasoning, model_name = await llm_api.generate_with_model(
@@ -150,8 +205,8 @@ class PromptOptimizer:
         """
         result = response.strip()
 
-        # 移除可能的 "Output:" 前缀
-        prefixes_to_remove = ["Output:", "output:", "Prompt:", "prompt:"]
+        # 移除可能的 "Output:" / "输出:" 等前缀
+        prefixes_to_remove = ["Output:", "output:", "Prompt:", "prompt:", "输出：", "输出:"]
         for prefix in prefixes_to_remove:
             if result.startswith(prefix):
                 result = result[len(prefix):].strip()
@@ -180,16 +235,22 @@ def get_optimizer(log_prefix: str = "[PromptOptimizer]") -> PromptOptimizer:
     return _optimizer_instance
 
 
-async def optimize_prompt(user_description: str, log_prefix: str = "[PromptOptimizer]", scene_only: bool = False) -> Tuple[bool, str]:
+async def optimize_prompt(
+    user_description: str,
+    log_prefix: str = "[PromptOptimizer]",
+    scene_only: bool = False,
+    api_format: str = None,
+) -> Tuple[bool, str]:
     """便捷函数：优化提示词
 
     Args:
         user_description: 用户原始描述
         log_prefix: 日志前缀
         scene_only: 仅生成场景/环境描述（自拍模式用）
+        api_format: 生图 API 格式，如 "doubao" 时输出中文自然语言提示词（火山方舟 Seedream）
 
     Returns:
         Tuple[bool, str]: (是否成功, 优化后的提示词)
     """
     optimizer = get_optimizer(log_prefix)
-    return await optimizer.optimize(user_description, scene_only=scene_only)
+    return await optimizer.optimize(user_description, scene_only=scene_only, api_format=api_format)

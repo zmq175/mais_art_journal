@@ -6,7 +6,7 @@ from .image_utils import ImageProcessor
 from .image_send_utils import resolve_image_data
 from .size_utils import (
     validate_image_size, get_image_size, get_image_size_async,
-    pixel_size_to_gemini_aspect, parse_pixel_size,
+    pixel_size_to_gemini_aspect, parse_pixel_size, enforce_min_pixels,
 )
 from .cache_manager import CacheManager
 from .time_utils import to_minutes, is_in_time_range

@@ -286,11 +286,13 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
         mode_text = "图生图" if is_img2img_mode else "文生图"
         logger.info(f"{self.log_prefix} 自然语言模式使用{mode_text}")
 
-        # 提示词优化
+        # 提示词优化（豆包格式使用中文自然语言提示词）
         optimizer_enabled = self.get_config("prompt_optimizer.enabled", True)
         if optimizer_enabled:
             logger.info(f"{self.log_prefix} 开始优化提示词...")
-            success, optimized_prompt = await optimize_prompt(description, self.log_prefix)
+            success, optimized_prompt = await optimize_prompt(
+                description, self.log_prefix, api_format=model_config.get("api_format")
+            )
             if success:
                 logger.info(f"{self.log_prefix} 提示词优化完成: {optimized_prompt[:80]}...")
                 description = optimized_prompt

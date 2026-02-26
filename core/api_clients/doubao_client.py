@@ -2,6 +2,7 @@
 from typing import Dict, Any, Tuple
 
 from .base_client import BaseApiClient, NonRetryableError, logger
+from ..utils import enforce_min_pixels
 
 
 class DoubaoClient(BaseApiClient):
@@ -54,6 +55,9 @@ class DoubaoClient(BaseApiClient):
             # 获取模型特定的配置参数
             custom_prompt_add = model_config.get("custom_prompt_add", "")
             prompt_add = prompt + custom_prompt_add
+
+            # Seedream 4.5/5.0 要求总像素 ≥ 3,686,400，过小尺寸自动按比例放大
+            size = enforce_min_pixels(size)
 
             # 构建请求参数
             request_params = {

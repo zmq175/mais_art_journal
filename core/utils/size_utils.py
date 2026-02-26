@@ -198,6 +198,39 @@ def gcd(a: int, b: int) -> int:
     return a
 
 
+# 豆包 Seedream 4.5/5.0 要求总像素 ≥ 3,686,400（约 1920×1920）
+DOUBAO_SEEDREAM_MIN_PIXELS = 3_686_400
+
+
+def enforce_min_pixels(size: str, min_pixels: int = DOUBAO_SEEDREAM_MIN_PIXELS) -> str:
+    """若尺寸为像素格式且总像素低于 min_pixels，按比例放大到满足要求后返回新尺寸字符串。
+
+    用于豆包 Seedream 等要求最低总像素的 API。非像素格式（如 2K、16:9）原样返回。
+    """
+    if not size or not isinstance(size, str):
+        return size or "1920x1920"
+    s = size.strip()
+    if "x" not in s.lower() and "*" not in s.lower():
+        return size
+    w, h = parse_pixel_size(s, 0, 0)
+    if w <= 0 or h <= 0:
+        return size
+    total = w * h
+    if total >= min_pixels:
+        return size
+    import math
+    scale = math.sqrt(min_pixels / total)
+    w_new = max(64, int(round(w * scale / 64) * 64))
+    h_new = max(64, int(round(h * scale / 64) * 64))
+    if w_new * h_new < min_pixels:
+        # 舍入后不足则按比例补足一边
+        if w_new >= h_new:
+            h_new = max(h_new, int(math.ceil(min_pixels / w_new / 64) * 64))
+        else:
+            w_new = max(w_new, int(math.ceil(min_pixels / h_new / 64) * 64))
+    return f"{w_new}x{h_new}"
+
+
 def parse_pixel_size(size: str, default_width: int = 1024, default_height: int = 1024) -> Tuple[int, int]:
     """解析像素尺寸字符串
 
