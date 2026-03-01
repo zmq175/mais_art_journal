@@ -30,9 +30,25 @@ def get_model_config(
     Returns:
         模型配置字典，或 None
     """
+    def _is_valid_config(cfg: dict) -> bool:
+        """判断配置是否有效（不同 API 格式有不同必需字段）"""
+        if not isinstance(cfg, dict):
+            return False
+        # 有 base_url 的格式（OpenAI/豆包/魔搭等）
+        if cfg.get("base_url"):
+            return True
+        # RunningHub 格式：需 api_key + model
+        fmt = (cfg.get("format") or "").strip().lower()
+        if fmt.startswith("runninghub") and cfg.get("api_key") and cfg.get("model"):
+            return True
+        # ComfyUI 格式：需 model（工作流路径）
+        if fmt == "comfyui" and cfg.get("model"):
+            return True
+        return False
+
     # 主路径：直接读嵌套 dict
     model_config = config_getter(f"models.{model_id}", None)
-    if isinstance(model_config, dict) and model_config.get("base_url"):
+    if _is_valid_config(model_config):
         return model_config
 
     # 回退：逐字段组装
@@ -48,6 +64,7 @@ def get_model_config(
         "img2img_model_index", "image_upload_url",
         "default_width", "default_height",
         "safety_settings",
+        "node_info_list",  # RunningHub 工作流
     ]
     assembled = {}
     for field in fields:
@@ -55,7 +72,7 @@ def get_model_config(
         if val is not None:
             assembled[field] = val
 
-    if assembled.get("base_url"):
+    if _is_valid_config(assembled):
         logger.debug(f"{log_prefix} 模型 {model_id} 配置逐字段组装完成")
         return assembled
 
@@ -63,7 +80,7 @@ def get_model_config(
     if model_id != default_model_id:
         logger.warning(f"{log_prefix} 模型 {model_id} 配置不存在，尝试默认模型 {default_model_id}")
         fallback = config_getter(f"models.{default_model_id}", None)
-        if isinstance(fallback, dict) and fallback.get("base_url"):
+        if _is_valid_config(fallback):
             return fallback
 
     logger.warning(f"{log_prefix} 模型配置未找到: {model_id}")

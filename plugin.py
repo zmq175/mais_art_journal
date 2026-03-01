@@ -801,7 +801,27 @@ class MaisArtJournalPlugin(BasePlugin):
             # 同时更新enable_plugin状态
             if "plugin" in self.config and "enabled" in self.config["plugin"]:
                 self.enable_plugin = self.config["plugin"]["enabled"]
-    
+
+    def get_config(self, key: str, default=None):
+        """覆盖 get_config：对 models.xxx 键，若主配置缺失则从原始 config 文件回退读取"""
+        val = super().get_config(key, default)
+        # 对 models.模型ID 的键，若返回空则尝试从原始文件读取（兼容非 schema 的模型如 runninghub_xiaolv）
+        if key.startswith("models.") and (val is None or (isinstance(val, dict) and not val)):
+            try:
+                raw = self.enhanced_config_manager.load_config()
+                if raw:
+                    parts = key.split(".")
+                    obj = raw
+                    for p in parts:
+                        obj = obj.get(p) if isinstance(obj, dict) else None
+                        if obj is None:
+                            break
+                    if obj is not None:
+                        return obj
+            except Exception:
+                pass
+        return val
+
     def _get_expected_config_version(self) -> str:
         """获取期望的配置版本号"""
         if "plugin" in self.config_schema and isinstance(self.config_schema["plugin"], dict):
