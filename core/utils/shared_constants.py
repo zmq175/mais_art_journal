@@ -26,12 +26,21 @@ ANTI_DUAL_PHONE_PROMPT = (
 # 向后兼容别名
 ANTI_DUAL_HANDS_PROMPT = f"{SELFIE_HAND_NEGATIVE}, {ANTI_DUAL_PHONE_PROMPT}"
 
-# 自拍服装：日系少女感穿搭（standard/mirror/photo 非 cosplay 时使用）
-# 避免大妈感、成熟风、老气穿搭
-SELFIE_OUTFIT_STYLE = (
-    "Japanese youthful fashion, casual cute outfit, soft girly style, "
-    "knee-high socks or cute skirt, youthful kawaii aesthetic, "
-    "sweater dress or cardigan, soft feminine clothing, schoolgirl-adjacent style"
+# 自拍服装与形象：JK、lolita 等少女穿搭随机（standard/mirror/photo 非 cosplay 时使用）
+# 发型：波波头或双马尾，齐刘海，黄发，柔和表情
+_APPEARANCE_BOB = "young East Asian woman, bob haircut, straight bangs, yellow blonde hair, soft gentle expression"
+_APPEARANCE_TWINTAILS = "young East Asian woman, twin tails, straight bangs, yellow blonde hair, soft gentle expression"
+_OUTFITS = (
+    "Japanese sailor-style school uniform, white blouse with navy sailor collar and red ribbon, gray pleated skirt, black knee-high socks",
+    "Japanese blazer school uniform, white shirt, red ribbon tie, pleated skirt, black knee-high socks, loafers",
+    "sweet lolita dress, frilly skirt, lace collar, bow, petticoat, knee-high socks, Mary Jane shoes",
+    "classic lolita dress, lace details, ribbon, puff sleeves, elegant skirt, knee-high socks",
+    "casual kawaii outfit, oversized sweater, pleated skirt, knee-high socks, cute accessories",
+    "cardigan over white blouse, plaid pleated skirt, knee-high socks, soft feminine style",
+)
+# 6 套服装 × 2 种发型 = 12 种组合随机
+SELFIE_OUTFIT_VARIANTS = tuple(
+    f"{app}, {outfit}" for app in (_APPEARANCE_BOB, _APPEARANCE_TWINTAILS) for outfit in _OUTFITS
 )
 SELFIE_OUTFIT_NEGATIVE = (
     "mature outfit, old-fashioned clothing, middle-aged style, "

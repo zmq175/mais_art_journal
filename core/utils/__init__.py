@@ -2,7 +2,7 @@
 
 from .shared_constants import (
     BASE64_IMAGE_PREFIXES, ANTI_DUAL_HANDS_PROMPT, SELFIE_HAND_NEGATIVE,
-    ANTI_DUAL_PHONE_PROMPT, SELFIE_OUTFIT_STYLE, SELFIE_OUTFIT_NEGATIVE,
+    ANTI_DUAL_PHONE_PROMPT, SELFIE_OUTFIT_VARIANTS, SELFIE_OUTFIT_NEGATIVE,
 )
 from .model_utils import get_model_config, merge_negative_prompt, inject_llm_original_size
 from .image_utils import ImageProcessor
