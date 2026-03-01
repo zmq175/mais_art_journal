@@ -13,6 +13,7 @@ from .api_clients import get_client_class
 from .utils import (
     ImageProcessor, CacheManager, validate_image_size, get_image_size,
     runtime_state, SELFIE_HAND_NEGATIVE, ANTI_DUAL_PHONE_PROMPT,
+    SELFIE_OUTFIT_STYLE, SELFIE_OUTFIT_NEGATIVE,
     get_model_config, merge_negative_prompt, inject_llm_original_size,
     resolve_image_data, schedule_auto_recall, optimize_prompt,
 )
@@ -599,8 +600,11 @@ class MaisArtAction(BaseAction):
         if bot_appearance:
             prompt_parts.append(bot_appearance)
 
+        # 服装：有 LLM 设计的 outfit 则用，否则非 cosplay 时用日系少女感穿搭
         if outfit:
             prompt_parts.append(outfit)
+        elif selfie_style != "cosplay":
+            prompt_parts.append(SELFIE_OUTFIT_STYLE)
 
         # 日程活动的表情和光线（如果有）
         if activity_scene:
@@ -642,6 +646,8 @@ class MaisArtAction(BaseAction):
         if base_negative:
             negative_parts.append(base_negative)
         negative_parts.append(SELFIE_HAND_NEGATIVE)
+        if selfie_style != "cosplay":
+            negative_parts.append(SELFIE_OUTFIT_NEGATIVE)
         if selfie_style == "standard":
             negative_parts.append(ANTI_DUAL_PHONE_PROMPT)
         # cosplay 不加防双手（角色姿势可双手自由）

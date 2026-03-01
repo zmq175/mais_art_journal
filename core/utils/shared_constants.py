@@ -25,3 +25,16 @@ ANTI_DUAL_PHONE_PROMPT = (
 
 # 向后兼容别名
 ANTI_DUAL_HANDS_PROMPT = f"{SELFIE_HAND_NEGATIVE}, {ANTI_DUAL_PHONE_PROMPT}"
+
+# 自拍服装：日系少女感穿搭（standard/mirror/photo 非 cosplay 时使用）
+# 避免大妈感、成熟风、老气穿搭
+SELFIE_OUTFIT_STYLE = (
+    "Japanese youthful fashion, casual cute outfit, soft girly style, "
+    "knee-high socks or cute skirt, youthful kawaii aesthetic, "
+    "sweater dress or cardigan, soft feminine clothing, schoolgirl-adjacent style"
+)
+SELFIE_OUTFIT_NEGATIVE = (
+    "mature outfit, old-fashioned clothing, middle-aged style, "
+    "frumpy, matronly, dowdy, grandmother clothes, "
+    "formal business suit, conservative dress, elderly fashion"
+)

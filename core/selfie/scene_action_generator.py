@@ -18,7 +18,7 @@ from typing import Dict, List, Optional
 from src.common.logger import get_logger
 
 from .schedule_provider import ActivityInfo
-from ..utils import SELFIE_HAND_NEGATIVE, ANTI_DUAL_PHONE_PROMPT
+from ..utils import SELFIE_HAND_NEGATIVE, ANTI_DUAL_PHONE_PROMPT, SELFIE_OUTFIT_STYLE, SELFIE_OUTFIT_NEGATIVE
 
 logger = get_logger("auto_selfie.scene")
 
@@ -369,6 +369,10 @@ async def convert_to_selfie_prompt(
     if bot_appearance:
         prompt_parts.append(bot_appearance)
 
+    # 2.5 服装：非 cosplay 时固定日系少女感穿搭
+    if selfie_style != "cosplay":
+        prompt_parts.append(SELFIE_OUTFIT_STYLE)
+
     # 3. 表情
     prompt_parts.append(f"({scene['expression']}:1.2)")
 
@@ -437,6 +441,10 @@ def get_negative_prompt_for_style(selfie_style: str, base_negative: str = "") ->
 
     # 所有风格都加手部质量负面提示词
     parts.append(SELFIE_HAND_NEGATIVE)
+
+    # 非 cosplay 时加服装负面（避免大妈感、老气穿搭）
+    if selfie_style != "cosplay":
+        parts.append(SELFIE_OUTFIT_NEGATIVE)
 
     # standard 额外加防双手拿手机，cosplay 不加（角色姿势可双手自由）
     if selfie_style == "standard":
