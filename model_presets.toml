@@ -152,3 +152,41 @@ custom_prompt_add = ", "
 negative_prompt_add = ""
 support_img2img = false
 auto_recall_delay = 0
+
+# ============================================================
+# RunningHub 云端 ComfyUI API
+# API Key 获取：https://www.runninghub.cn 右上角头像 -> API控制台
+# 需开通基础版及以上会员，免费用户不支持 API
+# ============================================================
+
+# [models.runninghub_workflow]
+# name = "RunningHub-工作流"
+# api_key = "YOUR_RUNNINGHUB_API_KEY"
+# format = "runninghub-workflow"
+# model = "1850925505116598274"
+# node_info_list = [
+#   { nodeId = "6", fieldName = "text", fieldValue = "${prompt}" },
+#   { nodeId = "3", fieldName = "seed", fieldValue = "${seed}" },
+#   { nodeId = "5", fieldName = "width", fieldValue = "${width}" },
+#   { nodeId = "5", fieldName = "height", fieldValue = "${height}" }
+# ]
+
+# [models.runninghub_quick]
+# name = "RunningHub-快捷创作"
+# api_key = "YOUR_RUNNINGHUB_API_KEY"
+# format = "runninghub-quick"
+# webapp_id = "1957344152277151746"
+# quick_create_code = "001"
+# node_info_list = [
+#   { nodeId = "45", fieldName = "text", fieldValue = "${prompt}" },
+#   { nodeId = "101", fieldName = "select", fieldValue = "2" }
+# ]
+
+# [models.runninghub_ai_app]
+# name = "RunningHub-AI应用"
+# api_key = "YOUR_RUNNINGHUB_API_KEY"
+# format = "runninghub-ai-app"
+# webapp_id = "1877265245566922800"
+# node_info_list = [
+#   { nodeId = "122", fieldName = "prompt", fieldValue = "${prompt}" }
+# ]

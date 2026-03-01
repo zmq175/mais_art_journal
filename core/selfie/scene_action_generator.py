@@ -119,6 +119,9 @@ _SCENE_STYLE_HINTS = {
 
     "photo": """
 7. STYLE CONSTRAINT - Third-person photo: both hands are FREE (someone else is taking the photo). Action can use both hands naturally (e.g. hands behind back, walking casually, holding a cup, leaning on railing, sitting). Prefer natural full-body poses.""",
+
+    "cosplay": """
+7. STYLE CONSTRAINT - Cosplay photo: character cosplay pose. Both hands are FREE. Action should fit anime character style (e.g. confident pose, peace sign, hand on hip, character stance, holding prop). Prefer poses that match the character's personality.""",
 }
 
 _SCENE_LLM_EXAMPLES = """
@@ -298,6 +301,12 @@ def _get_selfie_scene_for_style(selfie_style: str) -> List[str]:
             "third-person photograph, casual pose, natural lighting, medium shot",
             "candid photo, relaxed composition, natural stance",
         ]
+    if selfie_style == "cosplay":
+        return [
+            "cosplay photo, anime character cosplay, convention style, detailed costume",
+            "anime cosplay portrait, character accurate, high quality cosplay",
+            "cosplay selfie, anime style, professional cosplay photo",
+        ]
     return [
         "selfie, front camera view, POV selfie, (front facing selfie camera angle:1.3), looking at camera, slight high angle selfie, upper body shot, cowboy shot, (centered composition:1.2)",
         "selfie, front camera, arm extended, centered, upper body, looking at lens",
@@ -429,7 +438,7 @@ def get_negative_prompt_for_style(selfie_style: str, base_negative: str = "") ->
     # 所有风格都加手部质量负面提示词
     parts.append(SELFIE_HAND_NEGATIVE)
 
-    # standard 额外加防双手拿手机
+    # standard 额外加防双手拿手机，cosplay 不加（角色姿势可双手自由）
     if selfie_style == "standard":
         parts.append(ANTI_DUAL_PHONE_PROMPT)
 

@@ -15,12 +15,14 @@
 
 import asyncio
 import base64
+import random
 import os
 from typing import Optional
 
 from src.common.logger import get_logger
 
 from .schedule_provider import get_schedule_provider
+from ..pic_action import MaisArtAction
 from .scene_action_generator import convert_to_selfie_prompt, get_negative_prompt_for_style
 from .caption_generator import generate_caption
 from ..api_clients import generate_image_standalone
@@ -127,8 +129,15 @@ class AutoSelfieTask:
         logger.info(f"当前活动: {activity.description} ({activity.activity_type.value})")
 
         # 2. 生成自拍提示词
-        selfie_style = self.get_config("selfie.default_style", "standard")
-        bot_appearance = self.get_config("selfie.prompt_prefix", "")
+        if self.get_config("selfie.random_style", True):
+            selfie_style = random.choice(["standard", "mirror", "photo", "cosplay"])
+            logger.info(f"自动自拍随机风格: {selfie_style}")
+        else:
+            selfie_style = self.get_config("selfie.default_style", "standard")
+        if selfie_style == "cosplay":
+            bot_appearance = random.choice(MaisArtAction._COSPLAY_CHARACTERS)
+        else:
+            bot_appearance = self.get_config("selfie.prompt_prefix", "")
         prompt = await convert_to_selfie_prompt(activity, selfie_style, bot_appearance)
         if not prompt:
             logger.warning("LLM 自拍提示词生成失败，跳过本次自拍")

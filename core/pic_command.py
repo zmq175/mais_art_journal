@@ -1007,15 +1007,15 @@ class PicConfigCommand(PicCommandMixin, BaseCommand):
                 await self.send_text(f"自拍日程增强已{status}")
                 return True, f"自拍日程增强{status}成功", True
 
-            # /dr selfie standard|mirror|photo → 切换自拍风格
-            valid_styles = {"standard", "mirror", "photo"}
+            # /dr selfie standard|mirror|photo|cosplay → 切换自拍风格
+            valid_styles = {"standard", "mirror", "photo", "cosplay"}
             if action in valid_styles:
                 runtime_state.set_selfie_style(chat_id, action)
-                style_names = {"standard": "标准自拍", "mirror": "对镜自拍", "photo": "第三人称照片"}
+                style_names = {"standard": "标准自拍", "mirror": "对镜自拍", "photo": "第三人称照片", "cosplay": "经典女性动漫角色cos"}
                 await self.send_text(f"自拍风格已切换为: {style_names[action]}（{action}）")
                 return True, f"自拍风格切换为{action}", True
 
-            await self.send_text("格式：/dr selfie on|off（日程增强）或 /dr selfie standard|mirror|photo（自拍风格）")
+            await self.send_text("格式：/dr selfie on|off（日程增强）或 /dr selfie standard|mirror|photo|cosplay（自拍风格）")
             return False, "参数无效", True
 
         except Exception as e:
@@ -1168,7 +1168,7 @@ class PicStyleCommand(PicCommandMixin, BaseCommand):
                     "• /dr model on|off <模型ID> - 开关模型",
                     "• /dr recall on|off <模型ID> - 开关撤回",
                     "• /dr selfie on|off - 开关自拍日程增强",
-                    "• /dr selfie standard|mirror|photo - 切换自拍风格",
+                    "• /dr selfie standard|mirror|photo|cosplay - 切换自拍风格",
                     "• /dr default <模型ID> - 设置默认模型",
                     "• /dr set <模型ID> - 设置/dr命令模型",
                     "• /dr style <风格名> - 查看风格详情",

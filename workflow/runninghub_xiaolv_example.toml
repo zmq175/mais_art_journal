@@ -1,0 +1,20 @@
+# ============================================================
+# RunningHub 工作流配置：z-image LORA for 小绿
+# 仅配置正向提示词 + 分辨率，其余用工作流默认值
+# ============================================================
+
+[models.runninghub_xiaolv]
+name = "RunningHub-小绿LoRA"
+format = "runninghub-workflow"
+api_key = "YOUR_RUNNINGHUB_API_KEY"
+model = "2002109398342352897"
+fixed_size_enabled = true
+default_size = "1024x1520"
+
+# 只改这两项：提示词（48 编辑文本）+ 分辨率
+# 工作流拼接顺序：48 + ",yuta" + text_3(质量后缀)
+node_info_list = [
+  { nodeId = "48", fieldName = "编辑文本", fieldValue = "${prompt}" },
+  { nodeId = "13", fieldName = "width", fieldValue = "${width}" },
+  { nodeId = "13", fieldName = "height", fieldValue = "${height}" }
+]

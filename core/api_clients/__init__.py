@@ -10,6 +10,7 @@
 - Mengyuai 梦羽AI格式
 - Zai 格式 (Gemini转发)
 - ComfyUI 格式 (本地ComfyUI工作流)
+- RunningHub 格式 (工作流/快捷创作/AI应用)
 """
 
 from typing import Dict, Any, Tuple, Optional
@@ -24,6 +25,9 @@ from .shatangyun_client import ShatangyunClient
 from .mengyuai_client import MengyuaiClient
 from .zai_client import ZaiClient
 from .comfyui_client import ComfyUIClient
+from .runninghub_workflow_client import RunningHubWorkflowClient
+from .runninghub_quick_client import RunningHubQuickClient
+from .runninghub_ai_app_client import RunningHubAiAppClient
 
 __all__ = [
     'BaseApiClient',
@@ -36,6 +40,9 @@ __all__ = [
     'MengyuaiClient',
     'ZaiClient',
     'ComfyUIClient',
+    'RunningHubWorkflowClient',
+    'RunningHubQuickClient',
+    'RunningHubAiAppClient',
     'ApiClient',
     'get_client_class',
     'generate_image_standalone',
@@ -53,6 +60,9 @@ CLIENT_MAPPING = {
     'mengyuai': MengyuaiClient,
     'zai': ZaiClient,
     'comfyui': ComfyUIClient,
+    'runninghub-workflow': RunningHubWorkflowClient,
+    'runninghub-quick': RunningHubQuickClient,
+    'runninghub-ai-app': RunningHubAiAppClient,
 }
 
 

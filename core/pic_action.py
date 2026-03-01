@@ -1,3 +1,4 @@
+import random
 import traceback
 import base64
 import os
@@ -47,6 +48,8 @@ class MaisArtAction(BaseAction):
         # 自拍关键词
         "自拍", "selfie", "拍照", "对镜自拍", "镜子自拍", "照镜子", "发照片", "来张照片",
         "拍一张", "发张图", "看看你", "想看你", "来张自拍", "给张自拍", "现在的样子",
+        # cosplay 关键词
+        "cos", "cosplay", "扮成", "cos一下", "来张cos",
         # 色图关键词（基于自拍参考图生成合规性感图）
         "色图", "发色图", "来张色图", "来点色图", "色图来一张",
         # 装逼配图（基于自拍参考图生成装逼风格图）
@@ -77,7 +80,8 @@ class MaisArtAction(BaseAction):
 7. **反击倾向**：当你被攻击、吐槽、贬低、嘲讽（如说你丑、不好看、比不上别人、不行等）时，你有不服输的一面，可以主动发自拍回击——用自拍证明自己好看、打脸对方
 8. **色图场景**：当用户明确要色图（如「发色图」「来张色图」）、或大家讨论内容适合发色图时，使用 sexy_mode=true。基于自拍参考图生成合规性感图，不需要暧昧；无参考图时不要选此动作。
 9. **装逼配图场景**：当聊天内容适合装逼并配图时（如炫耀、秀一下、展示成果、得意时刻、装逼等），使用 flex_mode=true。基于自拍参考图生成参考图里的人物在装逼/炫耀的图片，description 可写装逼的由头或场景（如「刚考完」「买了新包」）。
-10. **服装设计**：由你根据场景、氛围或用户意图设计角色穿什么（可填入 outfit 或在 description 中体现），如浴衣、吊带裙、睡衣、卫衣、制服、汉服等，使画面更丰富。
+10. **cosplay 场景**：当用户要求 cos、cosplay、扮成某角色、来张 cos 等时，使用 selfie_mode=true 且 selfie_style=cosplay。会随机 cos 经典女性动漫角色（明日香、雷姆、Saber 等）。
+11. **服装设计**：由你根据场景、氛围或用户意图设计角色穿什么（可填入 outfit 或在 description 中体现），如浴衣、吊带裙、睡衣、卫衣、制服、汉服等，使画面更丰富。
 
 **绝对不要使用的情况：**（自拍场景如雌竞/反击/想看你等优先考虑，以下规则可放宽）
 1. 其他机器人的命令（如/nai、/sd、/mj等），这些是发给其他机器人的
@@ -94,7 +98,7 @@ class MaisArtAction(BaseAction):
         "strength": "图生图强度，0.1-1.0之间，值越高变化越大（仅图生图时使用，可选，默认0.7）",
         "size": "图片尺寸，如512x512、1024x1024等（可选，不指定则使用模型默认尺寸）",
         "selfie_mode": "是否启用自拍模式（true/false，可选，默认false）。启用后会自动添加自拍场景和手部动作",
-        "selfie_style": "自拍风格，可选值：standard（标准自拍，前置摄像头视角），mirror（对镜自拍，室内镜子场景），photo（第三人称照片，他人拍摄视角，自然姿态）。仅在selfie_mode=true时生效，可选，默认standard",
+        "selfie_style": "自拍风格，可选值：standard（标准自拍），mirror（对镜自拍），photo（第三人称照片），cosplay（cos经典女性动漫角色如明日香、雷姆等）。仅在selfie_mode=true时生效，可选，默认standard",
         "free_hand_action": "自由手部动作描述（英文）。如果指定此参数，将使用此动作而不是随机生成。仅在selfie_mode=true时生效，可选",
         "sexy_mode": "是否发色图（true/false，可选，默认false）。当大家讨论适合发色图或用户明确要色图时设为true，基于自拍参考图生成合规性感图，不需暧昧",
         "flex_mode": "是否装逼配图（true/false，可选，默认false）。当聊天适合装逼并配图时（炫耀、秀一下、展示、得意等）设为true，基于自拍参考图生成该人物装逼/炫耀风格的图",
@@ -108,7 +112,7 @@ class MaisArtAction(BaseAction):
         "自动检测是否有输入图片来决定文生图或图生图模式",
         "重点：不要连续发，如果你在前10句内已经发送过[图片]或者[表情包]或记录出现过类似描述的[图片]，就不要选择此动作",
         "支持指定模型：用户可以通过'用模型1画'、'model2生成'等方式指定特定模型",
-        "自拍模式选择：用户要求'自拍/拍个自拍'时用standard；要求'照镜子/对镜拍'时用mirror；要求'拍张照片/画一张你在XX的照片/第三人称'等非自拍视角时用photo",
+        "自拍模式选择：用户要求'自拍/拍个自拍'时用standard；要求'照镜子/对镜拍'时用mirror；要求'拍张照片/第三人称'时用photo；要求'cos/cosplay/扮成XX角色'时用cosplay",
         "自拍倾向：当用户表达想看你、发照片、来张图等模糊请求且未明确要画其他内容时，优先选择自拍动作（selfie_mode=true）",
         "雌竞倾向：当用户提到/夸奖其他人、其他女生，或对他人表示兴趣时，你有争强好胜的一面，愿意主动发自拍来争取注意、展现自己更好看，不必等用户明确要求",
         "反击倾向：当你被攻击、吐槽、贬低、嘲讽时（如说你丑、不好看、不行等），你有不服输的一面，愿意主动发自拍回击，用自拍证明自己",
@@ -172,13 +176,16 @@ class MaisArtAction(BaseAction):
         free_hand_action = self.action_data.get("free_hand_action", "").strip()
         outfit = self.action_data.get("outfit", "").strip()
 
-        # 自拍风格优先级：运行时命令设置 > LLM 指定 > 全局配置
+        # 自拍风格优先级：运行时命令设置 > LLM 指定 > 随机风格（若开启）> 全局配置
         global_style = self.get_config("selfie.default_style", "standard")
         runtime_style = runtime_state.get_selfie_style(self.chat_id, None)
         if runtime_style is not None:
             selfie_style = runtime_style
-        elif selfie_style_llm in ("standard", "mirror", "photo"):
+        elif selfie_style_llm in ("standard", "mirror", "photo", "cosplay"):
             selfie_style = selfie_style_llm
+        elif self.get_config("selfie.random_style", True):
+            selfie_style = random.choice(["standard", "mirror", "photo", "cosplay"])
+            logger.info(f"{self.log_prefix} 自拍随机风格: {selfie_style}")
         else:
             selfie_style = global_style
 
@@ -392,23 +399,26 @@ class MaisArtAction(BaseAction):
         http_base_url = model_config.get("base_url")
         http_api_key = model_config.get("api_key")
         api_format = model_config.get("format", "openai")
-        
+
+        # 不需要 base_url 的格式：comfyui 用本地地址；runninghub-* 用固定云端地址
+        formats_no_base_url = ("comfyui", "runninghub-workflow", "runninghub-quick", "runninghub-ai-app")
+
         # 检查base_url
-        if not http_base_url:
+        if not http_base_url and api_format not in formats_no_base_url:
             error_msg = "抱歉，图片生成功能所需的HTTP配置（如API地址）不完整，无法提供服务。"
             await self.send_text(error_msg)
             logger.error(f"{self.log_prefix} HTTP调用配置缺失: base_url.")
             return False, "HTTP配置不完整"
-        
+
         # 检查api_key（comfyui格式允许为空）
-        if api_format != "comfyui" and not http_api_key:
+        if api_format not in ("comfyui",) and not http_api_key:
             error_msg = "抱歉，图片生成功能所需的HTTP配置（如API密钥）不完整，无法提供服务。"
             await self.send_text(error_msg)
             logger.error(f"{self.log_prefix} HTTP调用配置缺失: api_key.")
             return False, "HTTP配置不完整"
 
         # API密钥验证（comfyui格式不需要API密钥）
-        if api_format != "comfyui" and ("YOUR_API_KEY_HERE" in http_api_key or "xxxxxxxxxxxxxx" in http_api_key):
+        if api_format != "comfyui" and ("YOUR_API_KEY_HERE" in (http_api_key or "") or "xxxxxxxxxxxxxx" in (http_api_key or "")):
             error_msg = "图片生成功能尚未配置，请设置正确的API密钥。"
             await self.send_text(error_msg)
             logger.error(f"{self.log_prefix} API密钥未配置")
@@ -544,8 +554,12 @@ class MaisArtAction(BaseAction):
         # 1. 添加强制主体设置（含手部质量引导）
         forced_subject = "(1girl:1.4), (solo:1.3), (perfect hands:1.2), (correct anatomy:1.1)"
 
-        # 2. 从独立的selfie配置中获取Bot的默认形象特征（不再从模型配置中获取）
-        bot_appearance = self.get_config("selfie.prompt_prefix", "").strip()
+        # 2. 获取形象特征：cosplay 时随机选经典女性动漫角色，否则用配置的 prompt_prefix
+        if selfie_style == "cosplay":
+            bot_appearance = random.choice(MaisArtAction._COSPLAY_CHARACTERS)
+            logger.info(f"{self.log_prefix} cosplay 随机角色: {bot_appearance[:50]}...")
+        else:
+            bot_appearance = self.get_config("selfie.prompt_prefix", "").strip()
 
         # 3. 定义自拍风格特定的场景设置（多种变体随机选择，增加多样性）
         selfie_scenes = self._get_selfie_scene_variants(selfie_style)
@@ -630,6 +644,7 @@ class MaisArtAction(BaseAction):
         negative_parts.append(SELFIE_HAND_NEGATIVE)
         if selfie_style == "standard":
             negative_parts.append(ANTI_DUAL_PHONE_PROMPT)
+        # cosplay 不加防双手（角色姿势可双手自由）
         selfie_negative_prompt = ", ".join(negative_parts)
 
         logger.info(f"{self.log_prefix} 自拍模式最终提示词: {final_prompt[:200]}...")
@@ -650,12 +665,35 @@ class MaisArtAction(BaseAction):
                 "third-person shot, natural composition, candid moment, relaxed pose",
                 "photograph, casual pose, natural lighting, medium shot or full body",
             ]
+        if selfie_style == "cosplay":
+            return [
+                "cosplay photo, convention background, anime cosplay, costume accurate",
+                "cosplay selfie, character costume, anime style, high quality cosplay",
+                "anime character cosplay, detailed costume, professional cosplay photo",
+                "cosplay portrait, character accurate, anime convention style",
+            ]
         # standard: 标准自拍
         return [
             "selfie, front camera view, arm extended, looking at camera",
             "selfie, front facing camera, POV selfie, slight high angle, upper body",
             "selfie, front camera, centered composition, cowboy shot, looking at lens",
         ]
+
+    # ---- 经典女性动漫角色 cosplay 提示词（英文 SD 标签） ----
+    _COSPLAY_CHARACTERS = [
+        "Photograph of young woman cosplaying Asuka Langley Soryu from Evangelion, long blonde hair with red hair clip, red plugsuit, confident proud expression",
+        "Photograph of young woman cosplaying Rei Ayanami from Evangelion, short blue-gray hair, blue plugsuit, serene expression, pale skin",
+        "Photograph of young woman cosplaying Rem from Re:Zero, blue hair, maid outfit, gentle smile, blue eyes",
+        "Photograph of young woman cosplaying Emilia from Re:Zero, long silver hair, purple dress, elf ears, kind expression",
+        "Photograph of young woman cosplaying Saber from Fate, blonde hair, knight armor, noble expression, green eyes",
+        "Photograph of young woman cosplaying Rin Tohsaka from Fate, twin tails, red coat, tsundere expression",
+        "Photograph of young woman cosplaying Violet Evergarden, blonde hair in braids, blue dress, soldier aesthetic, calm expression",
+        "Photograph of young woman cosplaying Hatsune Miku, long turquoise twin tails, futuristic outfit, cheerful expression",
+        "Photograph of young woman cosplaying Mikasa Ackerman from Attack on Titan, black hair, survey corps uniform, serious expression",
+        "Photograph of young woman cosplaying Zero Two from Darling in the Franxx, long pink hair, white suit, playful smile, horns",
+        "Photograph of young woman cosplaying Makise Kurisu from Steins Gate, long brown hair, lab coat, intelligent expression",
+        "Photograph of young woman cosplaying Yuki Nagato from Haruhi, short purple hair, school uniform, emotionless expression",
+    ]
 
     # ---- 风格专用手部动作池 ----
     # standard: 一只手举手机（画面外），只有另一只手空闲，仅单手动作
@@ -754,6 +792,22 @@ class MaisArtAction(BaseAction):
         "hand holding phone to ear, talking",
     ]
 
+    # cosplay: 角色扮演风格，可双手自由，偏角色气质动作
+    _COSPLAY_HAND_ACTIONS = [
+        "confident pose, hand on hip, character stance",
+        "peace sign, v sign, cheerful cosplay pose",
+        "hand touching hair, elegant character pose",
+        "arms crossed, cool character expression",
+        "hand near face, shy character pose",
+        "waving hand, friendly character gesture",
+        "hand on chest, sincere expression",
+        "pointing forward, dynamic character pose",
+        "hands clasped, gentle character pose",
+        "hand adjusting costume, detailed cosplay",
+        "salute pose, military character style",
+        "hand holding prop, character accurate",
+    ]
+
     # 色图模式：合规性感提示词（基于自拍参考图，不露点、不色情、艺术感）
     _SEXY_PROMPT_EN = (
         "1girl, solo, suggestive pose, tasteful, artistic, attractive, soft lighting, "
@@ -797,6 +851,8 @@ class MaisArtAction(BaseAction):
             return MaisArtAction._MIRROR_HAND_ACTIONS
         elif selfie_style == "photo":
             return MaisArtAction._PHOTO_HAND_ACTIONS
+        elif selfie_style == "cosplay":
+            return MaisArtAction._COSPLAY_HAND_ACTIONS
         else:
             return MaisArtAction._STANDARD_HAND_ACTIONS
 
@@ -892,17 +948,18 @@ class MaisArtAction(BaseAction):
         http_base_url = model_config.get("base_url")
         http_api_key = model_config.get("api_key")
         api_format = model_config.get("format", "openai")
-        
+        formats_no_base_url = ("comfyui", "runninghub-workflow", "runninghub-quick", "runninghub-ai-app")
+
         # 检查base_url
-        if not http_base_url:
+        if not http_base_url and api_format not in formats_no_base_url:
             return False, "HTTP配置不完整"
-        
+
         # 检查api_key（comfyui格式允许为空）
         if api_format != "comfyui" and not http_api_key:
             return False, "HTTP配置不完整"
-        
+
         # API密钥验证（仅对需要api_key的格式）
-        if api_format != "comfyui" and ("YOUR_API_KEY_HERE" in http_api_key or "xxxxxxxxxxxxxx" in http_api_key):
+        if api_format != "comfyui" and ("YOUR_API_KEY_HERE" in (http_api_key or "") or "xxxxxxxxxxxxxx" in (http_api_key or "")):
             return False, "API密钥未配置"
 
         # 合并额外负面提示词

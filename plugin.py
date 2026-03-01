@@ -384,12 +384,21 @@ class MaisArtJournalPlugin(BasePlugin):
             "default_style": ConfigField(
                 type=str,
                 default="standard",
-                description="自拍默认风格（手动和自动自拍共用）：standard(前置自拍)/mirror(对镜自拍)/photo(第三人称照片)。可通过 /dr selfie standard|mirror|photo 按聊天流覆盖",
+                description="自拍默认风格（当未启用随机风格时生效）：standard(前置自拍)/mirror(对镜自拍)/photo(第三人称照片)/cosplay(经典女性动漫角色cos)。可通过 /dr selfie standard|mirror|photo|cosplay 按聊天流覆盖",
                 label="默认自拍风格",
-                choices=["standard", "mirror", "photo"],
+                choices=["standard", "mirror", "photo", "cosplay"],
                 depends_on="selfie.enabled",
                 depends_value=True,
                 order=6
+            ),
+            "random_style": ConfigField(
+                type=bool,
+                default=True,
+                description="自拍时随机选择风格。开启后，当用户未指定风格且未通过 /dr selfie 固定风格时，每次自拍随机从 standard/mirror/photo/cosplay 中选一个。关闭则使用默认自拍风格",
+                label="随机风格",
+                depends_on="selfie.enabled",
+                depends_value=True,
+                order=7
             )
         },
         "auto_recall": {
