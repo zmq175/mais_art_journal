@@ -12,7 +12,7 @@ from .pic_action import MaisArtAction
 from .utils import (
     ImageProcessor, runtime_state, optimize_prompt, get_image_size_async,
     get_model_config, inject_llm_original_size, merge_negative_prompt,
-    resolve_image_data, schedule_auto_recall,
+    resolve_image_data, schedule_auto_recall, SELFIE_OUTFIT_VARIANTS, SELFIE_OUTFIT_NEGATIVE,
 )
 
 logger = get_logger("mais_art.command")
@@ -119,10 +119,13 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
             return await self._execute_style_mode(content, actual_style_name, style_prompt)
 
         # 步骤2：配置中没有该风格，判断是否是自然语言
-        # 色图/装逼等短词优先走自然语言（会加载自拍参考图），不当作风格名
+        # 色图/装逼/自拍等短词优先走自然语言（会加载自拍参考图），不当作风格名
         if self._is_sexy_description(content) or self._is_flex_description(content):
             logger.info(f"{self.log_prefix} 识别为自然语言模式（色图/装逼）: {content}")
             return await self._execute_natural_mode(content)
+        if self._is_selfie_description(content):
+            logger.info(f"{self.log_prefix} 识别为自拍模式: {content}")
+            return await self._execute_selfie_mode(content)
         # 检测自然语言特征
         action_words = ['画', '生成', '绘制', '创作', '制作', '画成', '变成', '改成', '用', '来', '帮我', '给我']
         has_action_word = any(word in content for word in action_words)
@@ -289,14 +292,18 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
                     if success_opt and optimized and not self._is_optimizer_refusal(optimized):
                         desc_safe = optimized
                 api_format = (model_config.get("api_format") or "").strip().lower()
-                bot_appearance = self.get_config("selfie.prompt_prefix", "").strip()
+                import random
+                outfit_appearance = random.choice(SELFIE_OUTFIT_VARIANTS)
                 if api_format == "doubao":
-                    base = f"{bot_appearance}，{MaisArtAction._SEXY_PROMPT_ZH}" if bot_appearance else MaisArtAction._SEXY_PROMPT_ZH
+                    base = f"{outfit_appearance}，{MaisArtAction._SEXY_PROMPT_ZH}"
                     sexy_prompt = f"{base}，{desc_safe}"
                 else:
-                    base = f"{bot_appearance}, {MaisArtAction._SEXY_PROMPT_EN}" if bot_appearance else MaisArtAction._SEXY_PROMPT_EN
+                    base = f"{outfit_appearance}, {MaisArtAction._SEXY_PROMPT_EN}"
                     sexy_prompt = f"{base}, {desc_safe}"
-                model_config = merge_negative_prompt(model_config, MaisArtAction._SEXY_NEGATIVE)
+                model_config = merge_negative_prompt(
+                    model_config,
+                    f"{MaisArtAction._SEXY_NEGATIVE}, {SELFIE_OUTFIT_NEGATIVE}",
+                )
                 image_size, _ = await get_image_size_async(model_config, sexy_prompt, None, self.log_prefix)
                 model_config = inject_llm_original_size(model_config, None)
                 try:
@@ -530,6 +537,117 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
         if d in flex_phrases:
             return True
         return "装逼" in d
+
+    def _is_selfie_description(self, description: str) -> bool:
+        """判断是否为自拍类描述，应走自拍参考图 + 完整自拍提示词（JK/lolita 等）。"""
+        if not description:
+            return False
+        d = description.strip().lower()
+        selfie_phrases = (
+            "自拍", "来张自拍", "给张自拍", "发张自拍", "拍张自拍",
+            "拍照", "来张照片", "发张照片", "拍一张", "照镜子", "对镜拍",
+            "看看你", "想看你", "来张图", "发张图", "现在的样子",
+        )
+        return any(p in d for p in selfie_phrases) or d in ("自拍", "拍照", "照片")
+
+    async def _execute_selfie_mode(self, description: str) -> Tuple[bool, Optional[str], bool]:
+        """执行自拍模式：使用完整自拍提示词（JK/lolita 等）+ 自拍参考图"""
+        chat_id = self._get_chat_id()
+        global_command_model = self.get_config("components.pic_command_model", "model1")
+        model_id = runtime_state.get_command_default_model(chat_id, global_command_model) if chat_id else global_command_model
+
+        if chat_id and not runtime_state.is_model_enabled(chat_id, model_id):
+            await self.send_text(f"模型 {model_id} 当前不可用")
+            return False, f"模型 {model_id} 已禁用", True
+
+        model_config = self._get_model_config(model_id)
+        if not model_config:
+            await self.send_text(f"模型 '{model_id}' 不存在")
+            return False, "模型配置不存在", True
+
+        selfie_enabled = self.get_config("selfie.enabled", True)
+        if not selfie_enabled:
+            await self.send_text("自拍功能暂未启用~")
+            return False, "自拍功能未启用", True
+
+        reference_image = self._load_selfie_reference_image()
+        if not reference_image:
+            await self.send_text("自拍需要先配置参考图哦~（selfie.reference_image_path）")
+            return False, "自拍无参考图", True
+
+        if not model_config.get("support_img2img", True):
+            await self.send_text(f"模型 {model_id} 不支持图生图，无法自拍")
+            return False, "模型不支持图生图", True
+
+        global_selfie_style = self.get_config("selfie.default_style", "standard")
+        if self.get_config("selfie.random_style", True):
+            import random
+            selfie_style = random.choice(["standard", "mirror", "photo", "cosplay"])
+            logger.info(f"{self.log_prefix} 自拍随机风格: {selfie_style}")
+        else:
+            selfie_style = runtime_state.get_selfie_style(chat_id, global_selfie_style) if chat_id else global_selfie_style
+
+        activity_scene = None
+        if self.get_config("selfie.schedule_enabled", True) and chat_id and runtime_state.is_selfie_schedule_enabled(chat_id, True):
+            try:
+                from .selfie.schedule_provider import get_schedule_provider
+                from .selfie.scene_action_generator import generate_scene_with_llm, get_action_for_activity
+                provider = get_schedule_provider()
+                if provider:
+                    activity = await provider.get_current_activity()
+                    if activity:
+                        activity_scene = await generate_scene_with_llm(activity, selfie_style)
+                        if not activity_scene:
+                            activity_scene = get_action_for_activity(activity)
+            except Exception:
+                pass
+
+        from .selfie.selfie_prompt_builder import build_selfie_prompt
+        prompt, negative_prompt = await build_selfie_prompt(
+            description, selfie_style, self.get_config,
+            activity_scene=activity_scene, outfit="", free_hand_action="",
+        )
+        model_config = merge_negative_prompt(model_config, negative_prompt)
+
+        image_size, _ = await get_image_size_async(model_config, prompt, None, self.log_prefix)
+        model_config = inject_llm_original_size(model_config, None)
+
+        enable_debug = self.get_config("components.enable_debug_info", False)
+        if enable_debug:
+            await self.send_text(f"自拍模式（{selfie_style}），使用 {model_id}...")
+
+        try:
+            api_client = ApiClient(self)
+            success, result = await api_client.generate_image(
+                prompt=prompt,
+                model_config=model_config,
+                size=image_size,
+                strength=0.6,
+                input_image_base64=reference_image,
+                max_retries=self.get_config("components.max_retries", 2),
+            )
+            if success:
+                final_image_data = self.image_processor.process_api_response(result)
+                if final_image_data:
+                    resolved_ok, resolved_data = await resolve_image_data(
+                        final_image_data, self._download_and_encode_base64, self.log_prefix
+                    )
+                    if resolved_ok:
+                        send_success = await self.send_image(resolved_data)
+                        if send_success:
+                            if enable_debug:
+                                await self.send_text("自拍生成完成！")
+                            await self._schedule_auto_recall_for_recent_message(model_config, model_id, time_module.time())
+                            return True, "自拍命令执行成功", True
+                await self.send_text("图片处理失败")
+                return False, "图片处理失败", True
+            else:
+                await self.send_text(f"自拍生成失败：{result}")
+                return False, f"自拍失败: {result}", True
+        except Exception as e:
+            logger.error(f"{self.log_prefix} 自拍命令异常: {e!r}", exc_info=True)
+            await self.send_text(f"执行失败：{str(e)[:100]}")
+            return False, str(e), True
 
     def _load_selfie_reference_image(self) -> Optional[str]:
         """加载自拍参考图 base64（与 pic_action 一致，支持多路径随机选一）。"""

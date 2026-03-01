@@ -258,25 +258,26 @@ class MaisArtAction(BaseAction):
             desc_safe = self._sanitize_sexy_description(description.strip())
             model_config = self._get_model_config(model_id)
             api_format = (model_config or {}).get("api_format", "").strip().lower()
-            bot_appearance = self.get_config("selfie.prompt_prefix", "").strip()
+            outfit_appearance = random.choice(SELFIE_OUTFIT_VARIANTS)
             if api_format == "doubao":
-                base = f"{bot_appearance}，{self._SEXY_PROMPT_ZH}" if bot_appearance else self._SEXY_PROMPT_ZH
+                base = f"{outfit_appearance}，{self._SEXY_PROMPT_ZH}"
                 parts = [base]
                 if outfit:
                     parts.append(outfit)
                 parts.append(desc_safe)
                 sexy_prompt = "，".join(parts)
             else:
-                base = f"{bot_appearance}, {self._SEXY_PROMPT_EN}" if bot_appearance else self._SEXY_PROMPT_EN
+                base = f"{outfit_appearance}, {self._SEXY_PROMPT_EN}"
                 parts = [base]
                 if outfit:
                     parts.append(outfit)
                 parts.append(desc_safe)
                 sexy_prompt = ", ".join(parts)
             logger.info(f"{self.log_prefix} 色图模式，基于自拍参考图生成合规性感图（描述已脱敏）")
+            sexy_negative = f"{self._SEXY_NEGATIVE}, {SELFIE_OUTFIT_NEGATIVE}"
             return await self._execute_unified_generation(
                 sexy_prompt, model_id, size, strength or 0.58, reference_image,
-                extra_negative_prompt=self._SEXY_NEGATIVE,
+                extra_negative_prompt=sexy_negative,
             )
 
         # 装逼配图：基于自拍参考图生成该人物装逼/炫耀风格图
@@ -287,16 +288,16 @@ class MaisArtAction(BaseAction):
                 return False, "装逼模式无参考图"
             model_config = self._get_model_config(model_id)
             api_format = (model_config or {}).get("api_format", "").strip().lower()
-            bot_appearance = self.get_config("selfie.prompt_prefix", "").strip()
+            outfit_appearance = random.choice(SELFIE_OUTFIT_VARIANTS)
             if api_format == "doubao":
-                base = f"{bot_appearance}，{self._FLEX_PROMPT_ZH}" if bot_appearance else self._FLEX_PROMPT_ZH
+                base = f"{outfit_appearance}，{self._FLEX_PROMPT_ZH}"
                 parts = [base]
                 if outfit:
                     parts.append(outfit)
                 parts.append(description.strip())
                 flex_prompt = "，".join(parts)
             else:
-                base = f"{bot_appearance}, {self._FLEX_PROMPT_EN}" if bot_appearance else self._FLEX_PROMPT_EN
+                base = f"{outfit_appearance}, {self._FLEX_PROMPT_EN}"
                 parts = [base]
                 if outfit:
                     parts.append(outfit)
@@ -305,6 +306,7 @@ class MaisArtAction(BaseAction):
             logger.info(f"{self.log_prefix} 装逼模式，基于自拍参考图生成装逼风格图")
             return await self._execute_unified_generation(
                 flex_prompt, model_id, size, strength or 0.55, reference_image,
+                extra_negative_prompt=SELFIE_OUTFIT_NEGATIVE,
             )
 
         # 处理自拍模式
