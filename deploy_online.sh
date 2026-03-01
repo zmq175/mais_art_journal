@@ -14,35 +14,11 @@ if [ ! -f config.toml ]; then
 fi
 
 echo ""
-echo "=== 请确保 config.toml 包含以下配置 ==="
-echo "将以下内容合并到 config.toml 中（若已存在可跳过）："
-echo ""
-cat << 'CONFIG_EOF'
-
-# ----- 以下为 RunningHub 工作流 + 自拍随机风格配置 -----
-
-[generation]
-default_model = "runninghub_xiaolv"
-
-[selfie]
-random_style = true
-default_style = "standard"
-
-[models.runninghub_xiaolv]
-name = "RunningHub-小绿LoRA"
-format = "runninghub-workflow"
-api_key = "你的RunningHub_API_KEY"
-model = "2002109398342352897"
-fixed_size_enabled = true
-default_size = "1024x1520"
-node_info_list = [
-  { nodeId = "48", fieldName = "编辑文本", fieldValue = "${prompt}" },
-  { nodeId = "13", fieldName = "width", fieldValue = "${width}" },
-  { nodeId = "13", fieldName = "height", fieldValue = "${height}" }
-]
-
-CONFIG_EOF
-echo ""
-echo "请将 api_key 替换为你的真实 RunningHub API Key"
+echo "=== 配置说明 ==="
+echo "参考 config.runninghub.example.toml 将 RunningHub 工作流配置合并到 config.toml"
+echo "关键配置："
+echo "  - generation.default_model = runninghub_xiaolv"
+echo "  - selfie.random_style = true （自拍随机选 standard/mirror/photo/cosplay）"
+echo "  - models.runninghub_xiaolv 需填写真实 api_key"
 echo ""
 echo "=== 部署完成 ==="

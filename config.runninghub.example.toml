@@ -1,0 +1,25 @@
+# ============================================================
+# RunningHub 工作流 + 自拍随机风格 配置示例
+# 将以下内容合并到 config.toml 中
+# 注意：将 api_key 替换为你的真实 RunningHub API Key
+# ============================================================
+
+[generation]
+default_model = "runninghub_xiaolv"
+
+[selfie]
+random_style = true
+default_style = "standard"
+
+[models.runninghub_xiaolv]
+name = "RunningHub-小绿LoRA"
+format = "runninghub-workflow"
+api_key = "你的RunningHub_API_KEY"
+model = "2002109398342352897"
+fixed_size_enabled = true
+default_size = "1024x1520"
+node_info_list = [
+  { nodeId = "48", fieldName = "编辑文本", fieldValue = "${prompt}" },
+  { nodeId = "13", fieldName = "width", fieldValue = "${width}" },
+  { nodeId = "13", fieldName = "height", fieldValue = "${height}" }
+]
