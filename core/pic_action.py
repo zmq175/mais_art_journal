@@ -246,7 +246,7 @@ class MaisArtAction(BaseAction):
             opt_input = self._sanitize_sexy_description(description) if sexy_mode else description
             scene_only = bool(selfie_mode) and not sexy_mode and not flex_mode
             model_config_for_optimizer = self._get_model_config(model_id)
-            api_format = model_config_for_optimizer.get("api_format") if model_config_for_optimizer else None
+            api_format = model_config_for_optimizer.get("format") if model_config_for_optimizer else None
             mode_label = "色图描述" if sexy_mode else ("装逼描述" if flex_mode else ("场景提示词" if scene_only else "提示词"))
             logger.info(f"{self.log_prefix} 开始优化{mode_label}: {opt_input[:50]}...")
             success, optimized_prompt = await optimize_prompt(

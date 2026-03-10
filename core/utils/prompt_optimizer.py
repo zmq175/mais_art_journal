@@ -171,7 +171,8 @@ class PromptOptimizer:
             return True, user_description
 
         try:
-            use_chinese_style = (api_format or "").strip().lower() in _CHINESE_PROMPT_FORMATS
+            _fmt = (api_format or "").strip().lower()
+            use_chinese_style = _fmt in _CHINESE_PROMPT_FORMATS or _fmt.startswith("runninghub")
             if scene_only:
                 system_prompt = SELFIE_SCENE_SYSTEM_PROMPT_DOUBAO if use_chinese_style else SELFIE_SCENE_SYSTEM_PROMPT
             else:
