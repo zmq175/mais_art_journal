@@ -12,7 +12,7 @@ from .pic_action import MaisArtAction
 from .utils import (
     ImageProcessor, runtime_state, optimize_prompt, get_image_size_async,
     get_model_config, inject_llm_original_size, merge_negative_prompt,
-    resolve_image_data, schedule_auto_recall, SELFIE_OUTFIT_VARIANTS, SELFIE_OUTFIT_NEGATIVE,
+    resolve_image_data, schedule_auto_recall, SELFIE_OUTFIT_VARIANTS,
 )
 
 logger = get_logger("mais_art.command")
@@ -291,19 +291,11 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
                     )
                     if success_opt and optimized and not self._is_optimizer_refusal(optimized):
                         desc_safe = optimized
-                api_format = (model_config.get("api_format") or "").strip().lower()
                 import random
                 outfit_appearance = random.choice(SELFIE_OUTFIT_VARIANTS)
-                if api_format == "doubao":
-                    base = f"{outfit_appearance}，{MaisArtAction._SEXY_PROMPT_ZH}"
-                    sexy_prompt = f"{base}，{desc_safe}"
-                else:
-                    base = f"{outfit_appearance}, {MaisArtAction._SEXY_PROMPT_EN}"
-                    sexy_prompt = f"{base}, {desc_safe}"
-                model_config = merge_negative_prompt(
-                    model_config,
-                    f"{MaisArtAction._SEXY_NEGATIVE}, {SELFIE_OUTFIT_NEGATIVE}",
-                )
+                base = f"{outfit_appearance}，{MaisArtAction._SEXY_PROMPT_ZH}"
+                sexy_prompt = f"{base}，{desc_safe}" if desc_safe else base
+                model_config = merge_negative_prompt(model_config, MaisArtAction._SEXY_NEGATIVE)
                 image_size, _ = await get_image_size_async(model_config, sexy_prompt, None, self.log_prefix)
                 model_config = inject_llm_original_size(model_config, None)
                 try:
@@ -361,14 +353,10 @@ class PicGenerationCommand(PicCommandMixin, BaseCommand):
                     )
                     if success_opt and optimized and not self._is_optimizer_refusal(optimized):
                         desc = optimized
-                api_format = (model_config.get("api_format") or "").strip().lower()
-                bot_appearance = self.get_config("selfie.prompt_prefix", "").strip()
-                if api_format == "doubao":
-                    base = f"{bot_appearance}，{MaisArtAction._FLEX_PROMPT_ZH}" if bot_appearance else MaisArtAction._FLEX_PROMPT_ZH
-                    flex_prompt = f"{base}，{desc}"
-                else:
-                    base = f"{bot_appearance}, {MaisArtAction._FLEX_PROMPT_EN}" if bot_appearance else MaisArtAction._FLEX_PROMPT_EN
-                    flex_prompt = f"{base}, {desc}"
+                import random as _random
+                outfit_appearance = _random.choice(SELFIE_OUTFIT_VARIANTS)
+                base = f"{outfit_appearance}，{MaisArtAction._FLEX_PROMPT_ZH}"
+                flex_prompt = f"{base}，{desc}" if desc else base
                 image_size, _ = await get_image_size_async(model_config, flex_prompt, None, self.log_prefix)
                 model_config = inject_llm_original_size(model_config, None)
                 try:

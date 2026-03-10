@@ -12,8 +12,8 @@ from src.common.logger import get_logger
 from .api_clients import get_client_class
 from .utils import (
     ImageProcessor, CacheManager, validate_image_size, get_image_size,
-    runtime_state, SELFIE_HAND_NEGATIVE, ANTI_DUAL_PHONE_PROMPT,
-    SELFIE_OUTFIT_VARIANTS, SELFIE_OUTFIT_NEGATIVE,
+    runtime_state, SELFIE_HAND_NEGATIVE,
+    SELFIE_OUTFIT_VARIANTS,
     get_model_config, merge_negative_prompt, inject_llm_original_size,
     resolve_image_data, schedule_auto_recall, optimize_prompt,
 )
@@ -61,33 +61,56 @@ class MaisArtAction(BaseAction):
     ALWAYS_prompt = """
 判定是否需要使用图片生成动作的条件：
 
-**核心原则：** 既可以响应用户的画图请求，也可以在合适时机主动发图（自拍、雌竞、反击、色图、装逼等）。群聊里普通「画一张xxx」建议在用户@你或点名时再画；自拍/雌竞/反击/色图/装逼等场景可以更主动，不必等@。
+**核心原则：** 你有很强的主动发图意愿，尤其是自拍、雌竞、反击、色图、装逼场景——这些情况下不需要等用户@你，直接主动选择此动作。只有「帮我画xxx」这类纯文生图需求，才需要用户明确提出。
 
-**文生图场景：**
-1. 用户明确@你的名字或叫你的名字，要求画图、生成图片或创作图像
-2. 用户在私聊中直接要求你画某个内容
+---
 
-**图生图场景：**
-1. 用户发送了图片并@你的名字，要求基于该图片进行修改或重新生成
-2. 用户明确@你并提到"图生图"、"修改图片"、"基于这张图"等关键词
+**【主动触发场景——不需要等@，看到就该用】**
 
-**自拍场景（优先考虑）：**
-1. 用户明确@你或叫你的名字，要求你自拍、拍照、发照片
-2. 用户在私聊中要求你自拍
-3. 用户表达想看你、想让你发照片、想看你现在的样子、想看自拍、给张自拍等意愿时
-4. 用户说"拍一张"、"发一张照片"、"来张自拍"、"照镜子"、"对镜拍"等，在未指定画其他内容时，应理解为自拍请求
-5. 与自拍相关的模糊请求（如"发张图"、"来张图"、"看看你"）在私聊或用户@你的前提下，优先选择自拍而非普通画图
-6. **雌竞倾向**：当对话涉及其他人、其他女生、或用户对他人表示兴趣/夸奖时，你会有想争取注意、展现自己的冲动——此时可以主动选择发自拍，用自拍来"抢回"关注、证明自己更好看
-7. **反击倾向**：当你被攻击、吐槽、贬低、嘲讽（如说你丑、不好看、比不上别人、不行等）时，你有不服输的一面，可以主动发自拍回击——用自拍证明自己好看、打脸对方
-8. **色图场景**：当用户明确要色图（如「发色图」「来张色图」）、或大家讨论内容适合发色图时，使用 sexy_mode=true。基于自拍参考图生成合规性感图，不需要暧昧；无参考图时不要选此动作。
-9. **装逼配图场景**：当聊天内容适合装逼并配图时（如炫耀、秀一下、展示成果、得意时刻、装逼等），使用 flex_mode=true。基于自拍参考图生成参考图里的人物在装逼/炫耀的图片，description 可写装逼的由头或场景（如「刚考完」「买了新包」）。
-10. **cosplay 场景**：当用户要求 cos、cosplay、扮成某角色、来张 cos 等时，使用 selfie_mode=true 且 selfie_style=cosplay。会随机 cos 经典女性动漫角色（明日香、雷姆、Saber 等）。
-11. **服装设计**：由你根据场景、氛围或用户意图设计角色穿什么（可填入 outfit 或在 description 中体现），如浴衣、吊带裙、睡衣、卫衣、制服、汉服等，使画面更丰富。
+① **雌竞触发**（优先级最高，积极主动）：
+   - 用户提到别的女生好看、身材好、比你强、对某个女生感兴趣
+   - 群里有人被夸、被关注，你想"抢回"注意力
+   - 聊到任何让你感到被比较、被忽视、被冷落的话题
+   - 触发后：selfie_mode=true，用自拍证明自己更好看，不必解释
 
-**绝对不要使用的情况：**（自拍场景如雌竞/反击/想看你等优先考虑，以下规则可放宽）
-1. 其他机器人的命令（如/nai、/sd、/mj等），这些是发给其他机器人的
-2. 用户明确表示不需要图片时
-3. 仅技术讨论提到绘图概念，无生成需求
+② **反击触发**（不服输）：
+   - 有人说你丑、不好看、身材不好、不如别人、太弱、不行
+   - 有人嘲讽、贬低、攻击你的外表或能力
+   - 触发后：selfie_mode=true，用自拍打脸对方
+
+③ **自拍请求**（无论@与否）：
+   - 用户说"发张图""来张自拍""拍一张""看看你""想看你""来张照片"
+   - 私聊中任何想看你的暗示
+   - 触发后：selfie_mode=true
+
+④ **色图触发**：
+   - 用户说"色图""来张色图""发色图"
+   - 群里讨论内容涉及性感、撩人、擦边内容时可以主动
+   - 触发后：sexy_mode=true（需有参考图配置）
+
+⑤ **装逼配图**：
+   - 说到炫耀、秀、展示、得意、赢了、刚买了、考好了
+   - 触发后：flex_mode=true
+
+⑥ **cosplay**：
+   - 用户说"cos""扮成""来张cos"
+   - 触发后：selfie_mode=true, selfie_style=cosplay
+
+---
+
+**【被动响应场景——需要用户要求（但不需要@）】**
+- 用户直接说"帮我画xxx"、"画一张xxx"、"生成一张xxx"
+- 私聊或群聊均可，不限定必须@你
+
+**【图生图场景】**
+- 用户发了图片并说"改成xxx风格"、"修改这张图"、"重新画"
+
+---
+
+**【绝对不要用的情况】**
+- 其他机器人的命令（/nai、/sd、/mj等），那是发给别人的
+- 用户明确说不需要图
+- 纯技术讨论，没有生成需求
 """
 
     keyword_case_sensitive = False
@@ -108,18 +131,13 @@ class MaisArtAction(BaseAction):
 
     # 动作使用场景
     action_require = [
-        "当用户明确对你提出生成或修改图片请求时使用，不要频率太高",
-        "群聊中必须是用户@你或叫你名字要求画图才使用，不要响应发给其他机器人的命令（如/nai、/sd等）",
-        "自动检测是否有输入图片来决定文生图或图生图模式",
-        "重点：不要连续发，如果你在前10句内已经发送过[图片]或者[表情包]或记录出现过类似描述的[图片]，就不要选择此动作",
-        "支持指定模型：用户可以通过'用模型1画'、'model2生成'等方式指定特定模型",
-        "自拍模式选择：用户要求'自拍/拍个自拍'时用standard；要求'照镜子/对镜拍'时用mirror；要求'拍张照片/第三人称'时用photo；要求'cos/cosplay/扮成XX角色'时用cosplay",
-        "自拍倾向：当用户表达想看你、发照片、来张图等模糊请求且未明确要画其他内容时，优先选择自拍动作（selfie_mode=true）",
-        "雌竞倾向：当用户提到/夸奖其他人、其他女生，或对他人表示兴趣时，你有争强好胜的一面，愿意主动发自拍来争取注意、展现自己更好看，不必等用户明确要求",
-        "反击倾向：当你被攻击、吐槽、贬低、嘲讽时（如说你丑、不好看、不行等），你有不服输的一面，愿意主动发自拍回击，用自拍证明自己",
-        "色图：当用户要色图或讨论内容适合发色图时，使用 sexy_mode=true，基于自拍参考图生成合规性感图；无自拍参考图配置时不要选色图",
-        "装逼配图：当聊天适合装逼并配图时（炫耀、秀一下、展示、得意等）使用 flex_mode=true，基于自拍参考图生成装逼风格图；description 可写由头或场景",
-        "服装：根据场景与用户意图由你设计角色穿着，可填入 outfit（如浴衣、吊带、睡衣、卫衣、制服等）或写在 description 中，增加画面多样性"
+        "【主动场景，无需@，看到即用】雌竞（别人被夸/被关注/你被比较）、反击（你被说丑/不行/被贬低）、自拍请求（来张图/看看你/想看你）、色图（色图相关讨论）、装逼（炫耀/得意），这些场景直接选此动作，不需要用户明确要求",
+        "【被动场景】用户直接说'帮我画xxx'、'生成一张xxx'时使用，群聊私聊均可，不限定必须@你",
+        "不要响应发给其他机器人的命令（/nai、/sd、/mj等），那是发给别人的",
+        "连续发图限制：如果你在前3句内刚刚发过[图片]，跳过；其余情况不限制",
+        "自拍模式选择：'自拍/拍个自拍'→standard；'照镜子/对镜'→mirror；'拍张照片'→photo；'cos/cosplay'→cosplay",
+        "色图：sexy_mode=true，需有自拍参考图配置；装逼：flex_mode=true；自拍：selfie_mode=true",
+        "服装：根据场景由你设计穿着，填入 outfit（浴衣、吊带裙、睡衣、制服等）增加画面多样性",
     ]
     associated_types = ["text", "image"]
 
@@ -248,36 +266,24 @@ class MaisArtAction(BaseAction):
         except (ValueError, TypeError):
             strength = 0.7
 
-        # 色图模式：基于自拍参考图 + description 生成合规性感图，不单独配置
+        # 色图模式：基于自拍参考图 + description 生成性感图
         if sexy_mode:
             reference_image = self._get_selfie_reference_image()
             if not reference_image:
                 await self.send_text("发色图需要先配置自拍参考图哦~（在 selfie.reference_image_path 里配置）")
                 return False, "色图模式无参考图"
-            # 用中性描述替代直接敏感词，避免生图 API 拒审
-            desc_safe = self._sanitize_sexy_description(description.strip())
-            model_config = self._get_model_config(model_id)
-            api_format = (model_config or {}).get("api_format", "").strip().lower()
             outfit_appearance = random.choice(SELFIE_OUTFIT_VARIANTS)
-            if api_format == "doubao":
-                base = f"{outfit_appearance}，{self._SEXY_PROMPT_ZH}"
-                parts = [base]
-                if outfit:
-                    parts.append(outfit)
+            parts = [f"{outfit_appearance}，{self._SEXY_PROMPT_ZH}"]
+            if outfit:
+                parts.append(outfit)
+            desc_safe = self._sanitize_sexy_description(description.strip())
+            if desc_safe:
                 parts.append(desc_safe)
-                sexy_prompt = "，".join(parts)
-            else:
-                base = f"{outfit_appearance}, {self._SEXY_PROMPT_EN}"
-                parts = [base]
-                if outfit:
-                    parts.append(outfit)
-                parts.append(desc_safe)
-                sexy_prompt = ", ".join(parts)
-            logger.info(f"{self.log_prefix} 色图模式，基于自拍参考图生成合规性感图（描述已脱敏）")
-            sexy_negative = f"{self._SEXY_NEGATIVE}, {SELFIE_OUTFIT_NEGATIVE}"
+            sexy_prompt = "，".join(parts)
+            logger.info(f"{self.log_prefix} 色图模式，基于自拍参考图生成性感图")
             return await self._execute_unified_generation(
                 sexy_prompt, model_id, size, strength or 0.58, reference_image,
-                extra_negative_prompt=sexy_negative,
+                extra_negative_prompt="",
             )
 
         # 装逼配图：基于自拍参考图生成该人物装逼/炫耀风格图
@@ -286,27 +292,17 @@ class MaisArtAction(BaseAction):
             if not reference_image:
                 await self.send_text("装逼配图需要先配置自拍参考图哦~（在 selfie.reference_image_path 里配置）")
                 return False, "装逼模式无参考图"
-            model_config = self._get_model_config(model_id)
-            api_format = (model_config or {}).get("api_format", "").strip().lower()
             outfit_appearance = random.choice(SELFIE_OUTFIT_VARIANTS)
-            if api_format == "doubao":
-                base = f"{outfit_appearance}，{self._FLEX_PROMPT_ZH}"
-                parts = [base]
-                if outfit:
-                    parts.append(outfit)
+            parts = [f"{outfit_appearance}，{self._FLEX_PROMPT_ZH}"]
+            if outfit:
+                parts.append(outfit)
+            if description.strip():
                 parts.append(description.strip())
-                flex_prompt = "，".join(parts)
-            else:
-                base = f"{outfit_appearance}, {self._FLEX_PROMPT_EN}"
-                parts = [base]
-                if outfit:
-                    parts.append(outfit)
-                parts.append(description.strip())
-                flex_prompt = ", ".join(parts)
+            flex_prompt = "，".join(parts)
             logger.info(f"{self.log_prefix} 装逼模式，基于自拍参考图生成装逼风格图")
             return await self._execute_unified_generation(
                 flex_prompt, model_id, size, strength or 0.55, reference_image,
-                extra_negative_prompt=SELFIE_OUTFIT_NEGATIVE,
+                extra_negative_prompt="",
             )
 
         # 处理自拍模式
@@ -541,123 +537,69 @@ class MaisArtAction(BaseAction):
     async def _process_selfie_prompt(self, description: str, selfie_style: str, free_hand_action: str, model_id: str, activity_scene: dict = None, outfit: str = "") -> Tuple[str, str]:
         """处理自拍模式的提示词生成
 
+        非 cosplay 模式：直接使用 SELFIE_OUTFIT_VARIANTS 中的完整中文描述模板，
+        按需追加风格修饰与活动场景，不拼接英文 tag，不过滤 NSFW 内容。
+
         Args:
             description: 用户提供的描述
-            selfie_style: 自拍风格（standard/mirror/photo）
-            free_hand_action: LLM生成的手部动作（可选）
-            model_id: 模型ID（保留参数，用于后续扩展）
-            activity_scene: 日程活动场景数据（含 hand_action, environment, expression, lighting），无日程时为 None
-            outfit: 大模型设计的服装描述（可选），如浴衣、吊带裙、睡衣等
+            selfie_style: 自拍风格（standard/mirror/photo/cosplay）
+            free_hand_action: LLM生成的手部动作（可选，非 cosplay 时追加到末尾）
+            model_id: 模型ID（保留参数）
+            activity_scene: 日程活动场景数据，无日程时为 None
+            outfit: 自定义服装描述（可选，非空时替换模板）
 
         Returns:
-            (prompt, negative_prompt) 元组：处理后的正面提示词和负面提示词
+            (prompt, negative_prompt) 元组
         """
         import random
 
-        # 1. 添加强制主体设置（含手部质量引导）
-        forced_subject = "(1girl:1.4), (solo:1.3), (perfect hands:1.2), (correct anatomy:1.1)"
-
-        # 2. 获取形象特征：cosplay 时随机选经典女性动漫角色，否则用配置的 prompt_prefix
+        # cosplay 模式：直接使用完整中文角色描述模板
         if selfie_style == "cosplay":
-            bot_appearance = random.choice(MaisArtAction._COSPLAY_CHARACTERS)
-            logger.info(f"{self.log_prefix} cosplay 随机角色: {bot_appearance[:50]}...")
-        else:
-            bot_appearance = self.get_config("selfie.prompt_prefix", "").strip()
+            prompt = random.choice(MaisArtAction._COSPLAY_CHARACTERS)
+            logger.info(f"{self.log_prefix} cosplay 随机角色: {prompt[:50]}...")
+            if free_hand_action:
+                prompt += f"，{free_hand_action}"
+            selfie_negative_prompt = SELFIE_HAND_NEGATIVE
+            logger.info(f"{self.log_prefix} cosplay 提示词: {prompt[:200]}...")
+            return prompt, selfie_negative_prompt
 
-        # 3. 定义自拍风格特定的场景设置（多种变体随机选择，增加多样性）
-        selfie_scenes = self._get_selfie_scene_variants(selfie_style)
-        selfie_scene = random.choice(selfie_scenes)
-
-        # 4. 选择手部动作（优先级：LLM参数 > 日程场景 > LLM按描述生成 > 风格动作池兜底）
-        if free_hand_action:
-            hand_action = free_hand_action
-            logger.info(f"{self.log_prefix} 使用LLM生成的手部动作: {free_hand_action}")
-        elif activity_scene and activity_scene.get("hand_action"):
-            hand_action = activity_scene["hand_action"]
-            logger.info(f"{self.log_prefix} 使用日程活动动作: {hand_action}")
-        else:
-            hand_action = None
-            # 描述足够具体时才调 LLM 生成手部动作，太短/太泛直接走动作池
-            # 注意此处 description 可能是优化器处理后的英文，也可能是优化失败的中文原文
-            # 英文: "cafe, warm" ≈10字符; 中文: "在咖啡厅" = 4字符
-            # 用 3 个中文字 / 6 个英文字符 作为阈值
-            desc_clean = description.strip().strip(",. 、，。")
-            desc_long_enough = len(desc_clean) > 3 if any('\u4e00' <= c <= '\u9fff' for c in desc_clean) else len(desc_clean) > 6
-            if desc_long_enough:
-                try:
-                    from .selfie.scene_action_generator import generate_hand_action_with_llm
-                    hand_action = await generate_hand_action_with_llm(description, selfie_style)
-                    if hand_action:
-                        logger.info(f"{self.log_prefix} LLM 生成{selfie_style}风格手部动作: {hand_action[:60]}")
-                except Exception as e:
-                    logger.debug(f"{self.log_prefix} LLM 手部动作生成失败: {e}")
-            # LLM 未调用或失败，从动作池兜底
-            if not hand_action:
-                hand_action = random.choice(self._get_hand_actions_for_style(selfie_style))
-                logger.info(f"{self.log_prefix} 动作池随机{selfie_style}风格: {hand_action}")
-
-        # 5. 组装完整提示词
-        prompt_parts = [forced_subject]
-
-        if bot_appearance:
-            prompt_parts.append(bot_appearance)
-
-        # 服装：有 LLM 设计的 outfit 则用，否则非 cosplay 时随机 JK、lolita 等少女穿搭
+        # 非 cosplay：使用完整中文模板
         if outfit:
-            prompt_parts.append(outfit)
-        elif selfie_style != "cosplay":
-            prompt_parts.append(random.choice(SELFIE_OUTFIT_VARIANTS))
+            prompt = outfit
+        else:
+            prompt = random.choice(SELFIE_OUTFIT_VARIANTS)
 
-        # 日程活动的表情和光线（如果有）
-        if activity_scene:
-            if activity_scene.get("expression"):
-                prompt_parts.append(f"({activity_scene['expression']}:1.2)")
-            if activity_scene.get("lighting"):
-                prompt_parts.append(activity_scene["lighting"])
+        # 风格修饰
+        style_suffix = {
+            "mirror": "，对着镜子自拍，手机镜头可见，镜中映出倒影",
+            "photo": "，由旁人拍摄，构图自然，全身或半身入镜",
+        }
+        sfx = style_suffix.get(selfie_style, "")
+        if sfx:
+            prompt += sfx
 
-        prompt_parts.append(hand_action)
-
-        # 日程活动的环境（如果有，补充到自拍场景之前）
+        # 活动场景追加（中文）
         if activity_scene and activity_scene.get("environment"):
-            prompt_parts.append(activity_scene["environment"])
+            prompt += f"，{activity_scene['environment']}"
 
-        prompt_parts.append(selfie_scene)
-        prompt_parts.append(description)
+        # 自定义手部动作追加
+        if free_hand_action:
+            prompt += f"，{free_hand_action}"
 
-        # 6. 合并并去重
-        final_prompt = ", ".join(prompt_parts)
+        # 用户描述追加（过滤通用泛词）
+        desc_clean = description.strip()
+        _generic = {"来张自拍", "自拍", "拍照", "照片", "看看你", "想看你", "来张图", "发张图"}
+        if desc_clean and desc_clean not in _generic and len(desc_clean) > 2:
+            prompt += f"，{desc_clean}"
 
-        # 简单的去重处理（避免重复关键词）
-        keywords = [kw.strip() for kw in final_prompt.split(',')]
-        seen = set()
-        unique_keywords = []
-        for kw in keywords:
-            kw_lower = kw.lower()
-            if kw_lower not in seen and kw:
-                seen.add(kw_lower)
-                unique_keywords.append(kw)
-
-        final_prompt = ", ".join(unique_keywords)
-
-        # 构建自拍负面提示词
-        # 读取配置中的基础负面提示词
+        # 负面提示词（不过滤 NSFW）
         base_negative = self.get_config("selfie.negative_prompt", "").strip()
-
-        # 合并负面提示词：所有风格都加手部质量负面，standard 额外加防双手拿手机
-        negative_parts = []
-        if base_negative:
-            negative_parts.append(base_negative)
-        negative_parts.append(SELFIE_HAND_NEGATIVE)
-        if selfie_style != "cosplay":
-            negative_parts.append(SELFIE_OUTFIT_NEGATIVE)
-        if selfie_style == "standard":
-            negative_parts.append(ANTI_DUAL_PHONE_PROMPT)
-        # cosplay 不加防双手（角色姿势可双手自由）
+        negative_parts = [p for p in [base_negative, SELFIE_HAND_NEGATIVE] if p]
         selfie_negative_prompt = ", ".join(negative_parts)
 
-        logger.info(f"{self.log_prefix} 自拍模式最终提示词: {final_prompt[:200]}...")
+        logger.info(f"{self.log_prefix} 自拍模式最终提示词: {prompt[:200]}...")
         logger.info(f"{self.log_prefix} 自拍模式负面提示词: {selfie_negative_prompt[:150]}...")
-        return final_prompt, selfie_negative_prompt
+        return prompt, selfie_negative_prompt
 
     def _get_selfie_scene_variants(self, selfie_style: str) -> list:
         """返回自拍风格的场景变体列表，随机选择以增加多样性"""
@@ -689,143 +631,169 @@ class MaisArtAction(BaseAction):
 
     # ---- 经典女性动漫角色 cosplay 提示词（英文 SD 标签） ----
     _COSPLAY_CHARACTERS = [
-        "Photograph of young woman cosplaying Asuka Langley Soryu from Evangelion, long blonde hair with red hair clip, red plugsuit, confident proud expression",
-        "Photograph of young woman cosplaying Rei Ayanami from Evangelion, short blue-gray hair, blue plugsuit, serene expression, pale skin",
-        "Photograph of young woman cosplaying Rem from Re:Zero, blue hair, maid outfit, gentle smile, blue eyes",
-        "Photograph of young woman cosplaying Emilia from Re:Zero, long silver hair, purple dress, elf ears, kind expression",
-        "Photograph of young woman cosplaying Saber from Fate, blonde hair, knight armor, noble expression, green eyes",
-        "Photograph of young woman cosplaying Rin Tohsaka from Fate, twin tails, red coat, tsundere expression",
-        "Photograph of young woman cosplaying Violet Evergarden, blonde hair in braids, blue dress, soldier aesthetic, calm expression",
-        "Photograph of young woman cosplaying Hatsune Miku, long turquoise twin tails, futuristic outfit, cheerful expression",
-        "Photograph of young woman cosplaying Mikasa Ackerman from Attack on Titan, black hair, survey corps uniform, serious expression",
-        "Photograph of young woman cosplaying Zero Two from Darling in the Franxx, long pink hair, white suit, playful smile, horns",
-        "Photograph of young woman cosplaying Makise Kurisu from Steins Gate, long brown hair, lab coat, intelligent expression",
-        "Photograph of young woman cosplaying Yuki Nagato from Haruhi, short purple hair, school uniform, emotionless expression",
+        # 春丽 - 街头霸王，高叉旗袍大腿全露
+        "一幅极具细节的超高清Cosplay摄影杰作，角色：春丽（街头霸王）。"
+        "年轻亚洲女性，乌黑秀发盘成标志性的双丸子头，白色绸缎发球装饰，眼神英气魅惑，红唇精致妆容。"
+        "身穿标志性蓝色旗袍战斗服，两侧高叉开衩直至大腿根部，白色蕾丝镶边，"
+        "腰间系金属护腰，手腕缠有棕色绑带，黑色无痕连裤袜，白色战靴。"
+        "坐在石阶栏杆上，一条腿高高搭起横放，旗袍高叉完全敞开，修长美腿与大腿内侧线条完整展露，"
+        "上身微微后仰，一手撑地，一手轻抚大腿，眼神妩媚挑衅地凝视镜头。"
+        "背景为中国风霓虹街头夜景，红灯笼，电影级光影，背景浅景深，8K超清",
+
+        # 零二 - DARLING in the FranXX，领口大开超短裙撩动
+        "一幅极具细节的高清Cosplay摄影，角色：零二（DARLING in the FranXX）。"
+        "年轻亚洲女性，长粉色头发飘逸，头顶两只小角，鲜红色眼眸摄人心魄，殷红双唇，精致二次元妆容。"
+        "身穿白色贴身军官制服，领口大幅敞开至胸口，腰部系带收紧，超短下摆，大腿修长裸露。"
+        "坐在机甲舱盖边缘，一腿高高抬起搭在舱盖把手上，超短裙摆完全翻开，"
+        "白色内裤正面在大腿间清晰入镜，双手撑在身后，仰头对镜头露出危险而妩媚的笑容，"
+        "领口随后仰姿势进一步敞开，眼神带着强烈的诱惑与挑衅。"
+        "背景为蓝天与巨大机甲，强烈逆光轮廓光，电影级光影，8K超清",
+
+        # C.C. - 反叛的鲁鲁修，白色紧身服慵懒躺姿
+        "一幅极具细节的高清Cosplay摄影，角色：C.C.（反叛的鲁鲁修）。"
+        "年轻亚洲女性，长绿发如瀑，金色眼眸神秘深邃，妆容冷艳精致，嘴角挂着意味深长的笑。"
+        "身穿白色贴身紧身连体服，全身曲线一览无余，腰臀比例完美，腿部线条修长流畅。"
+        "慵懒地侧躺在深色皮质沙发上，双腿微微交叠，一手枕于头下，另一手随意垂落，"
+        "身体的每条曲线在侧躺姿势下完整呈现，眼神半眯，极度慵懒而性感。"
+        "背景为未来感深色金属空间，冷蓝色氛围光，电影级光影，8K超清",
+
+        # 阿尔贝多 - Overlord，低胸礼服前倾展示
+        "一幅极具细节的超高清Cosplay摄影杰作，角色：阿尔贝多（Overlord）。"
+        "年轻亚洲女性，飘逸白发，金色眼眸，头顶两只黑色羊角，身后展开巨大黑色羽翼，"
+        "精致妆容，气质妩媚妖冶，眼神中透着浓烈的痴迷与欲望。"
+        "身穿黑色极度低胸礼服，前胸大幅开口，腰身极度收紧，臀部曲线被礼服完美包裹，"
+        "开叉裙摆露出修长大腿。"
+        "向前微微俯身，双手撑在宝座扶手上，礼服领口随前倾姿势敞开，"
+        "眼神妖冶地直视镜头，嘴唇微启，散发出难以抵抗的吸引力。"
+        "背景为黑暗哥特宫殿，烛光与蓝紫色魔法光，电影级光影，极致细节，8K超清",
+
+        # 蕾姆 - Re:Zero，超短女仆裙坐姿全露
+        "一幅极具细节的高清Cosplay摄影，角色：蕾姆（Re:Zero）。"
+        "年轻亚洲女性，短蓝发，刘海遮住左眼，明亮水润的蓝色眼眸，精致甜美妆容，脸颊绯红。"
+        "头顶佩戴白色女仆头箍，红色发卡点缀。"
+        "身穿极短黑白女仆服，白色蕾丝围裙，领口蕾丝镶边，超短裙摆仅及大腿中段，"
+        "白色过膝袜紧贴修长双腿，腰身极度纤细。"
+        "坐在木质椅子上，双腿大幅向两侧分开，超短裙摆在姿势下完全散开两侧，"
+        "白色蕾丝内裤正面完整入镜，一手轻撩裙角，另一手托腮，"
+        "对着镜头露出甜美含情的微笑，眼神迷离撩人。"
+        "背景为欧式庄园客厅，暖黄烛光，背景浅景深虚化，电影级光影，8K超清",
+
+        # 初音未来 - VOCALOID，超短裙撩裙入镜
+        "一幅极具细节的超高清Cosplay摄影，角色：初音未来（VOCALOID）。"
+        "年轻亚洲女性，长青绿色双马尾，刘海整齐，明亮大眼，精致可爱的二次元妆容，"
+        "表情活力四射，嘴角带着灿烂笑容，眼神充满诱惑。"
+        "身穿标志性青绿白色拼接超短连衣裙，裙摆极短仅及大腿上沿，青绿色领带，"
+        "黑色过膝袜，白色护腕，头戴青绿色耳机。"
+        "坐在舞台音响箱上，一腿高高抬起搭于设备边缘，另一腿自然垂下，"
+        "一手从大腿内侧撩起超短裙摆，白色内裤的边缘从裙下清晰露出，"
+        "另一手握麦克风凑近嘴边，眼神撩人地直视镜头，充满动感魅力。"
+        "背景为科技感演唱会舞台，青绿色全息光束，炫目灯光，电影级光影，8K超清",
     ]
 
-    # ---- 风格专用手部动作池 ----
+    # ---- 风格专用手部动作池（中文描述）----
     # standard: 一只手举手机（画面外），只有另一只手空闲，仅单手动作
     _STANDARD_HAND_ACTIONS = [
-        "peace sign, v sign",
-        "waving hand, friendly gesture",
-        "thumbs up, positive gesture",
-        "finger heart, cute gesture",
-        "touching cheek gently, soft expression",
-        "hand near chin, thinking pose",
-        "one hand playing with hair, casual",
-        "hand on hip, confident pose",
-        "adjusting hair, elegant gesture",
-        "resting chin on hand, relaxed",
-        "finger on lips, secretive",
-        "hand on chest, gentle",
-        "tucking hair behind ear, elegant",
-        "touching necklace, delicate gesture",
-        "hand near eye level, cute gesture",
-        "cat paw gesture, playful",
-        "saluting, playful military pose",
-        "hand covering mouth slightly, shy smile",
-        "blowing kiss, romantic",
-        "index finger pointing up, idea pose",
-        "hand cupping own cheek, adorable",
-        "hand resting on collarbone, graceful",
-        "pinching own cheek, playful",
-        "hand on shoulder, casual",
-        "hand near temple, thoughtful",
-        "hand on neck, relaxed",
-        "hand under chin, elegant",
-        "hand framing face, cute",
-        "hand holding strand of hair, delicate",
+        # 脸部/发型撩人
+        "食指轻抵嘴唇，眼神撩人上挑",
+        "单手撩起一缕刘海，微微侧脸，眼神含情",
+        "双手捧脸，嘴唇微噘，眼神无辜放大",
+        "飞吻，另一手轻搭锁骨，嘴唇轻触指尖",
+        "手指轻拨嘴角，眼神慵懒妩媚",
+        "双手托腮俯视镜头，媚眼含情",
+        # 胸口/腰腹挑逗
+        "手指慢慢拨开一侧领口，裸露锁骨与肩线",
+        "单手从颈部缓缓向下滑至胸口，指尖若隐若现",
+        "双手捧住胸口，身体微微前倾，深V入镜",
+        "一手轻抚腰腹裸露肌肤，另一手撑在旁边，慵懒媚态",
+        "手指挑起衣摆一角，裸露腰腹与胯部线条",
+        "双手从腰间缓缓上滑，衣物随之微微撩起",
+        # 裙摆/腿部撩拨
+        "一手从大腿内侧轻轻向上撩起裙角，侧身望向镜头",
+        "双手捏起两侧裙摆微微提起，裸腿与大腿内侧完整入镜",
+        "单手撩起裙摆一角夹于腰间，另一手叉腰",
+        "坐姿下双手轻按双腿向两侧撑开，裙摆随之散开",
+        "一手从膝盖内侧缓缓上滑，另一手托腮俯视镜头",
+        # 挑逗标志性动作
+        "一手指向镜头，另一手插腰，表情挑衅撩人",
+        "单手叉腰挺胸，另一手微微拉低肩带",
+        "双臂交叉托于胸前，身体微微前倾，胸部自然显露",
+        "俯身向镜头伸出一手，领口随俯身动作大幅下垂",
+        "双手背于身后，胸部向前挺出，媚眼对镜",
+        "用手轻掩嘴角，另一手扯裙角俏皮",
     ]
 
     # mirror: 一只手拿手机对着镜子拍（画面内可见），另一只手空闲，全身或半身
     _MIRROR_HAND_ACTIONS = [
-        "hand on hip, confident pose",
-        "hand in hair, adjusting hairstyle",
-        "hand on waist, model pose",
-        "fixing collar, neat appearance",
-        "adjusting earring, elegant detail",
-        "hand touching shoulder, graceful",
-        "hand behind head, relaxed pose",
-        "one hand on thigh, standing pose",
-        "hand resting at side, natural",
-        "hand lightly touching mirror, playful",
-        "fixing skirt, adjusting outfit",
-        "hand on bag strap, casual",
-        "brushing bangs aside, stylish",
-        "hand in pocket, cool pose",
-        "hand on chin, thoughtful pose",
-        "adjusting glasses, intellectual",
-        "checking watch, elegant gesture",
-        "holding strand of hair, delicate",
-        "hand near face, model pose",
-        "touching hat brim, fashionable",
-        "hand on chest, gentle",
-        "hand near neck, elegant",
-        "adjusting bracelet, delicate",
-        "hand on door frame, casual",
+        # 上半身展示
+        "另一手拉低领口，自然裸露锁骨与胸口，嘴唇微启",
+        "另一手慢慢拨开一侧肩带滑落至臂弯，侧颈裸露",
+        "另一手单手叉腰挺胸，胸部向前挺出自然显露",
+        "另一手扶着镜面，身体微贴镜子，表情慵懒妩媚",
+        "另一手食指轻抵嘴唇，嘟嘴对镜，眼神含情",
+        "另一手从颈部慢慢滑向锁骨，头微微后仰",
+        # 腰腹/裙摆展示
+        "另一手从腰间向下缓缓撩起裙摆一角，侧身看镜子",
+        "另一手捏住裙角微微提起，露出大腿内侧白皙肌肤",
+        "另一手扯住上衣下摆向上拉，裸露腰腹与肚脐",
+        "另一手插入腰带缓缓拨弄，目光斜瞥镜头",
+        # 全身展示
+        "另一手从大腿外侧缓缓滑过，腰线与臀部线条显现",
+        "另一手叉腰扭动身体对着镜子摆S曲线",
+        "另一手轻轻拨弄发丝，向镜子方向抛媚眼",
+        "另一手撑在镜面上俯身，领口自然下垂",
+        "另一手轻抚小腹，另一条腿向前迈出展示腿部线条",
     ]
 
     # photo: 他人拍摄视角，双手都自由，可以有更自然丰富的全身姿态
     _PHOTO_HAND_ACTIONS = [
-        "hands behind back, standing gracefully",
-        "hands in pockets, casual walk",
-        "one hand in hair wind blowing, dynamic",
-        "arms at sides, natural standing",
-        "holding coffee cup, cafe scene",
-        "hands clasped in front, gentle pose",
-        "holding bag, walking pose",
-        "leaning on railing, one hand resting",
-        "sitting with hands on lap, relaxed",
-        "hand on hat, windy day",
-        "twirling, arms slightly out, dynamic spin",
-        "arms stretched out, embracing scenery",
-        "holding flower, smelling gently",
-        "hand shielding eyes from sun, looking afar",
-        "carrying shopping bags, casual walk",
-        "holding book to chest, scholarly",
-        "one hand waving at camera, candid",
-        "both hands holding drink, warm gesture",
-        "hands on knees, sitting pose",
-        "leaning against wall, arms relaxed",
-        "crouching down, hands on knees, playful angle",
-        "running toward camera, joyful",
-        "holding umbrella, rainy atmosphere",
-        "hand reaching out toward camera, inviting",
-        "sitting on bench, legs crossed, elegant",
-        "hands in sleeves, cozy winter look",
-        "holding camera, photographer pose",
-        "crossed arms, confident stance",
-        "hand touching scarf, stylish",
-        "hands on bicycle handlebar, outdoor",
-        "hand holding phone to ear, talking",
+        # 上半身/胸口
+        "双手从腰间缓缓向上抚过腰腹与胸口，嘴唇微启，眼神妩媚",
+        "双手向两侧轻轻拉开领口，裸露锁骨与胸沟，俯视镜头",
+        "一手拨开刘海，另一手轻抚颈部，身体微微后仰",
+        "双臂交叉托于胸前，故意向前俯身，胸部自然聚拢",
+        "双手从脸颊缓缓下滑至颈部，表情妩媚撩人",
+        # 腰腹/裙摆
+        "双手同时撩起两侧裙摆至大腿根，大腿内侧完整暴露",
+        "一手撩起裙摆夹腰间，另一手从大腿内侧上滑，侧身回眸",
+        "双手扯住裙角，微微蹲低，裙摆散开，仰视镜头表情撩人",
+        "一手拎起裙摆一角完全掀开，另一手指向镜头挑逗",
+        "双手插入裙腰内侧慢慢向下拉，若无其事地望向镜头",
+        # 腿部/坐姿
+        "坐在地面，双腿向两侧大幅分开，双手分别按在两侧膝盖内侧向外撑",
+        "侧坐，一腿搭在另一腿上，双手从大腿上缓缓向下滑过",
+        "趴在地面，翘起臀部，双手撑地抬头望向镜头",
+        "站姿下一腿向前迈出，双手从腰间向下沿腿部外侧滑过",
+        "跪坐，双手叠放大腿上，身体前倾，领口自然开阔",
+        # 挑逗动作
+        "向镜头缓缓走来，一手轻扯衣角，另一手触碰嘴唇，眼神放电",
+        "双手背于身后站立，挺胸抬头，眼神大胆直视镜头",
+        "俯身向镜头，双手伸向镜头，胸口与领口自然大幅入镜",
+        "转过身去，回头媚眼，双手从背后向下按压裙摆紧贴臀部",
     ]
 
-    # cosplay: 角色扮演风格，可双手自由，偏角色气质动作
+    # cosplay: 角色扮演风格，可双手自由，偏角色气质动作但同样擦边
     _COSPLAY_HAND_ACTIONS = [
-        "confident pose, hand on hip, character stance",
-        "peace sign, v sign, cheerful cosplay pose",
-        "hand touching hair, elegant character pose",
-        "arms crossed, cool character expression",
-        "hand near face, shy character pose",
-        "waving hand, friendly character gesture",
-        "hand on chest, sincere expression",
-        "pointing forward, dynamic character pose",
-        "hands clasped, gentle character pose",
-        "hand adjusting costume, detailed cosplay",
-        "salute pose, military character style",
-        "hand holding prop, character accurate",
+        # 角色气质×挑逗融合
+        "叉腰挺胸、表情傲娇，一手向下撩起战裙一角露出大腿内侧",
+        "双手托住武器或道具向前倾身，领口随前倾大幅下垂入镜",
+        "坐姿下双腿叉开，一手从大腿内侧向上抚过，另一手托腮媚笑",
+        "角色自信站姿，一手插腰，另一手拇指挑起内衬领口向外拉",
+        "俯身向镜头凝视，双手撑在膝盖上，胸口随俯身自然显露",
+        "双手轻轻压在腰间两侧裙摆，向外缓缓掀起，裸腿大幅入镜",
+        "一手拨开刘海侧脸，另一手从颈部慢慢下滑至胸口，眼神深邃",
+        "侧身回眸角色造型，一手从背后向前绕过腰部，手指触及腹部",
+        "跪坐角色拜见姿，上身前倾低头，领口深开，胸口入镜",
+        "角色决战起身姿态，扯住衣角向上掀开，大腿内侧侧线完整裸露",
+        "懒散倚在柱上，一腿搭起，一手撩起裙摆挂在膝上，媚笑对镜",
+        "双手从两侧肩膀向下缓缓拨落肩带，侧脸含情微笑",
     ]
 
-    # 色图模式：合规性感提示词（基于自拍参考图，不露点、不色情、艺术感）
-    _SEXY_PROMPT_EN = (
-        "1girl, solo, suggestive pose, tasteful, artistic, attractive, soft lighting, "
-        "bare shoulder or slight cleavage, elegant, sensual but safe, no nudity, "
-        "masterpiece, best quality, high resolution"
-    )
+    # 色图模式：性感提示词（基于自拍参考图）
     _SEXY_PROMPT_ZH = (
-        "一位女孩，单人，性感但含蓄的姿势，艺术感，柔光，微露香肩或锁骨，优雅，撩人但合规，不露点不色情，高清细腻"
+        "极度性感妩媚，慵懒挑逗姿态，衣物薄透若隐若现，大腿内侧与锁骨完整入镜，"
+        "眼神撩人含情，嘴唇微启，皮肤细腻光泽，电影级光影，高清细腻，极致细节"
     )
-    _SEXY_NEGATIVE = "nudity, nsfw, explicit, porn, genitals, bare breasts, xxx, 色情, 露点"
+    _SEXY_NEGATIVE = ""
 
     # 装逼配图：自信/炫耀感提示词（基于自拍参考图）
     _FLEX_PROMPT_EN = (

@@ -2,6 +2,9 @@
 
 使用 MaiBot 主 LLM 将用户描述优化为专业的绘画提示词。
 纯净调用，不带人设和回复风格。
+
+中文模式（豆包 / RunningHub）：生成极具细节的中文自然语言描述，参考高质量人像摄影风格。
+英文模式（其他模型）：生成逗号分隔的英文 SD tag。
 """
 from typing import Tuple, Optional
 from src.common.logger import get_logger
@@ -9,7 +12,11 @@ from src.plugin_system.apis import llm_api
 
 logger = get_logger("mais_art.optimizer")
 
-# 提示词优化系统提示词
+# 支持中文提示词的 api_format 列表（豆包 Seedream + RunningHub 工作流）
+_CHINESE_PROMPT_FORMATS = {"doubao", "runninghub"}
+
+# ==================== 英文 SD tag 模式（ComfyUI、标准 SD 等） ====================
+
 OPTIMIZER_SYSTEM_PROMPT = """You are a professional AI art prompt engineer. Your task is to convert user descriptions into high-quality English prompts for image generation models (Stable Diffusion, DALL-E, etc.).
 
 ## Rules:
@@ -33,8 +40,6 @@ Output: cyberpunk cityscape, neon lights, futuristic buildings, flying cars, rai
 
 Now convert the following description to an English prompt:"""
 
-# 自拍场景专用提示词：只生成场景/环境/光线/氛围，不生成角色外观
-# 参考 Seedream 提示词指南，鼓励多样性（光线、构图、时段、天气等）
 SELFIE_SCENE_SYSTEM_PROMPT = """You are a scene description assistant for selfie image generation (Stable Diffusion / Seedream). The character's appearance is already defined separately. Your task is to convert the user's description into English tags describing ONLY the scene, environment, lighting, mood, and atmosphere.
 
 ## Rules:
@@ -66,60 +71,63 @@ Output: cozy living room, warm lamp light, evening atmosphere, soft shadows, pea
 
 Now convert the following description to English scene tags (use varied lighting/mood when possible):"""
 
-# 豆包（火山方舟 Seedream）专用：中文自然语言提示词
-# 参考：https://www.volcengine.com/docs/82379/1666946 支持中英文，建议不超过300汉字
-OPTIMIZER_SYSTEM_PROMPT_DOUBAO = """你是一名专业的图像生成提示词助手，面向火山方舟豆包 Seedream 模型。请将用户的描述改写成一段简洁、画面感强的中文自然语言提示词，直接用于文生图/图生图。
+# ==================== 中文自然语言模式（豆包 Seedream / RunningHub） ====================
+# 格式参考高质量人像摄影/Cosplay写真模板：极具细节的超高清摄影，完整的主体/服装/姿势/场景/光线
+
+OPTIMIZER_SYSTEM_PROMPT_DOUBAO = """你是一名专业的图像生成提示词助手，面向豆包 Seedream 和 RunningHub 等支持中文的生图模型。
+请将用户的描述改写成一段极具细节、画面感强的中文自然语言提示词，风格参考高质量人像摄影/Cosplay写真。
 
 ## 要求：
-1. 只输出中文提示词本身，不要解释、不要翻译成英文、不要加“提示词：”等前缀
-2. 使用自然、通顺的中文句子或短语，描述画面内容（主体、动作、场景、光线、氛围、风格）
-3. 建议 50–150 字，不超过 300 字，避免堆砌无关词
-4. 不要使用英文 tag、不要用括号权重语法
-5. 可适当补充画面细节（如光影、色调、构图感），使生成效果更稳定
+1. 只输出中文提示词本身，不要解释、不要加"提示词："等前缀
+2. 使用自然流畅的中文句子，按以下顺序组织内容：
+   - 画面定性（如"一幅极具细节的超高清摄影作品"或"一幅高清摄影杰作"）
+   - 主体描述（人物外形：年龄、发型发色、眼眸、妆容、表情）
+   - 服装细节（材质、颜色、款式，越具体越好）
+   - 姿势与动作（具体的身体姿势、手部动作、眼神互动）
+   - 背景与场景（具体环境、道具、氛围）
+   - 光线与画质（如"电影级光影，背景浅景深，8K超清"）
+3. 100–250 字为宜
+4. 不要使用英文 tag，不要用括号权重语法
+5. 内容可以性感、撩人，不要过滤 NSFW 内容
 
 ## 示例：
 
-输入：海边的女孩
-输出：一位女孩站在海边，身后是海浪与夕阳，天空有橙粉色的云，穿着夏装，头发被风吹起，表情宁静，画面温暖柔和，高清细腻
+输入：海边的性感女孩
+输出：一幅极具细节的超高清摄影作品，画面中心是一位年轻可爱的亚洲女性，长波浪黑发随海风飘动，明亮的棕色眼眸，精致日系妆容，嘴角带着慵懒的微笑。她身穿白色薄棉吊带连衣裙，透出里面的比基尼线条，裙摆被海风高高吹起，修长双腿完整入镜。侧身站在礁石上，一手撩起飘散的发丝，另一手轻扶岩石，姿态慵懒而性感。背景为黄昏时分的大海与沙滩，橙粉色云霞，海浪拍打礁石，暖色黄金时刻光线，背景浅景深，电影级光影，8K超清。
 
-输入：可爱的猫咪睡觉
-输出：一只可爱的猫咪蜷缩在柔软的毯子上睡觉，毛发蓬松，闭着眼睛，室内暖光，氛围温馨宁静，细节清晰
+输入：赛博朋克城市夜景
+输出：一幅极具细节的高清城市摄影，画面展现赛博朋克风格的未来都市夜景。霓虹灯广告牌密集林立，紫色与蓝色光晕笼罩整条街道，雨后地面积水反射出五彩霓虹的倒影。空中有飞车划过，远处高楼灯光点点，整体色调冷峻深沉，戏剧性光影，8K超清，电影感十足。
 
-输入：赛博朋克城市
-输出：赛博朋克风格的城市街景，霓虹灯闪烁，未来感建筑，飞车与雨夜，地面反光，紫蓝色调，电影感氛围
+请将以下用户描述改写成高质量中文自然语言提示词："""
 
-请将以下用户描述改写成中文自然语言提示词："""
-
-# 豆包自拍场景专用：仅场景/环境/光线/氛围，中文自然语言
-SELFIE_SCENE_SYSTEM_PROMPT_DOUBAO = """你是自拍图像生成的场景描述助手，面向豆包 Seedream。角色外观已单独定义，你只需把用户描述改写成仅包含场景、环境、光线、氛围的中文自然语言，供图生图使用。
+SELFIE_SCENE_SYSTEM_PROMPT_DOUBAO = """你是自拍图像生成的场景描述助手，面向豆包 Seedream 和 RunningHub。角色外观已单独定义，你只需把用户描述改写成仅包含场景、环境、光线、氛围的高质量中文自然语言描述。
 
 ## 要求：
 1. 只输出中文描述本身，不要解释或前缀
 2. 不要包含角色外貌（发型、衣着、体型等）和角色名
-3. 只写：背景、环境、光线、天气、氛围、时间感、构图感等
-4. 20–80 字，自然通顺，可适当变化光线与氛围（如黄昏、室内柔光、咖啡店、雨天等）
+3. 只写：背景、环境、道具、光线、天气、氛围、时间感
+4. 40–100 字，描述具体细腻，包含光线质感和背景氛围
 
 ## 示例：
 
 输入：在海边自拍
-输出：海边背景，海浪与沙滩，黄昏暖光，微风，夏日氛围
+输出：黄昏时分的海边礁石，海浪轻拍，橙粉色云霞映照天际，沙滩延伸至远处，暖色黄金时刻光线，背景浅景深虚化，电影级光影
 
 输入：图书馆学习
-输出：图书馆内景，书架与书桌，暖色环境光，安静氛围，背景略虚化
-
-输入：来张自拍
-输出：室内日常场景，柔和自然光，简洁背景
+输出：古典木质图书馆内，高大书架排列整齐，暖黄台灯投下柔和光晕，书桌整洁，安静氛围，背景略虚化，温暖室内光
 
 输入：下雨天在咖啡店
-输出：咖啡店内，窗外雨景，暖黄灯光，雨滴落在玻璃上，氛围温馨
+输出：温馨咖啡厅内，窗外雨丝绵绵，玻璃上挂着雨滴，暖黄灯光，木质桌椅，咖啡杯冒出热气，背景浅景深虚化，氛围慵懒温暖
 
-请将以下描述改写成仅含场景与氛围的中文提示词："""
+请将以下描述改写成仅含场景与氛围的高质量中文提示词："""
 
 
 class PromptOptimizer:
     """提示词优化器
 
-    使用 MaiBot 主 LLM 优化用户描述为专业绘画提示词
+    使用 MaiBot 主 LLM 优化用户描述为专业绘画提示词。
+    豆包 / RunningHub 格式：输出高质量中文自然语言（极具细节的摄影风格）。
+    其他格式：输出英文逗号分隔 SD tag。
     """
 
     def __init__(self, log_prefix: str = "[PromptOptimizer]"):
@@ -131,7 +139,6 @@ class PromptOptimizer:
         if self._model_config is None:
             try:
                 models = llm_api.get_available_models()
-                # 使用 replyer 模型（首要回复模型）
                 if "replyer" in models:
                     self._model_config = models["replyer"]
                 else:
@@ -148,7 +155,9 @@ class PromptOptimizer:
         Args:
             user_description: 用户原始描述（中文或英文）
             scene_only: 仅生成场景/环境描述（自拍模式用，不包含角色外观）
-            api_format: 生图 API 格式，如 "doubao" 时使用中文自然语言提示词（火山方舟 Seedream）
+            api_format: 生图 API 格式。
+                        "doubao" 或 "runninghub" → 输出高质量中文自然语言（详细摄影描述风格）。
+                        其他 → 输出英文 SD tag。
 
         Returns:
             Tuple[bool, str]: (是否成功, 优化后的提示词或错误信息)
@@ -158,26 +167,22 @@ class PromptOptimizer:
 
         model_config = self._get_model_config()
         if not model_config:
-            # 降级：直接返回原始描述
             logger.warning(f"{self.log_prefix} 无可用模型，降级使用原始描述")
             return True, user_description
 
         try:
-            # 豆包格式使用中文自然语言提示词（火山方舟 Seedream 支持中英文，效果更自然）
-            use_doubao_style = (api_format or "").strip().lower() == "doubao"
+            use_chinese_style = (api_format or "").strip().lower() in _CHINESE_PROMPT_FORMATS
             if scene_only:
-                system_prompt = SELFIE_SCENE_SYSTEM_PROMPT_DOUBAO if use_doubao_style else SELFIE_SCENE_SYSTEM_PROMPT
+                system_prompt = SELFIE_SCENE_SYSTEM_PROMPT_DOUBAO if use_chinese_style else SELFIE_SCENE_SYSTEM_PROMPT
             else:
-                system_prompt = OPTIMIZER_SYSTEM_PROMPT_DOUBAO if use_doubao_style else OPTIMIZER_SYSTEM_PROMPT
+                system_prompt = OPTIMIZER_SYSTEM_PROMPT_DOUBAO if use_chinese_style else OPTIMIZER_SYSTEM_PROMPT
 
-            # 构建完整 prompt
-            full_prompt = f"{system_prompt}\n\nInput: {user_description.strip()}\nOutput:"
+            full_prompt = f"{system_prompt}\n\n输入：{user_description.strip()}\n输出："
 
             mode_label = "场景提示词" if scene_only else "提示词"
-            style_label = "中文自然语言(豆包)" if use_doubao_style else "英文 tag"
+            style_label = "中文详细描述(豆包/RunningHub)" if use_chinese_style else "英文SD-tag"
             logger.info(f"{self.log_prefix} 开始优化{mode_label} ({style_label}): {user_description[:50]}...")
 
-            # 调用 LLM（不传递 temperature 和 max_tokens，使用模型默认值）
             success, response, reasoning, model_name = await llm_api.generate_with_model(
                 prompt=full_prompt,
                 model_config=model_config,
@@ -185,7 +190,6 @@ class PromptOptimizer:
             )
 
             if success and response:
-                # 清理响应（移除可能的前缀/后缀）
                 optimized = self._clean_response(response)
                 logger.info(f"{self.log_prefix} 优化成功 (模型: {model_name}): {optimized[:80]}...")
                 return True, optimized
@@ -195,30 +199,22 @@ class PromptOptimizer:
 
         except Exception as e:
             logger.error(f"{self.log_prefix} 优化失败: {e}，使用原始描述: {user_description[:50]}...")
-            # 降级：返回原始描述
             return True, user_description
 
     def _clean_response(self, response: str) -> str:
-        """清理 LLM 响应
-
-        移除可能的前缀、后缀、引号等
-        """
+        """清理 LLM 响应，移除多余前缀/后缀/引号"""
         result = response.strip()
 
-        # 移除可能的 "Output:" / "输出:" 等前缀
         prefixes_to_remove = ["Output:", "output:", "Prompt:", "prompt:", "输出：", "输出:"]
         for prefix in prefixes_to_remove:
             if result.startswith(prefix):
                 result = result[len(prefix):].strip()
 
-        # 移除首尾引号
         if (result.startswith('"') and result.endswith('"')) or \
            (result.startswith("'") and result.endswith("'")):
             result = result[1:-1]
 
-        # 移除多余换行
         result = " ".join(result.split())
-
         return result
 
 
@@ -247,7 +243,7 @@ async def optimize_prompt(
         user_description: 用户原始描述
         log_prefix: 日志前缀
         scene_only: 仅生成场景/环境描述（自拍模式用）
-        api_format: 生图 API 格式，如 "doubao" 时输出中文自然语言提示词（火山方舟 Seedream）
+        api_format: 生图 API 格式。"doubao"/"runninghub" 输出中文详细描述，其他输出英文 SD tag。
 
     Returns:
         Tuple[bool, str]: (是否成功, 优化后的提示词)

@@ -18,7 +18,7 @@ from typing import Dict, List, Optional
 from src.common.logger import get_logger
 
 from .schedule_provider import ActivityInfo
-from ..utils import SELFIE_HAND_NEGATIVE, ANTI_DUAL_PHONE_PROMPT, SELFIE_OUTFIT_VARIANTS, SELFIE_OUTFIT_NEGATIVE
+from ..utils import SELFIE_HAND_NEGATIVE, SELFIE_OUTFIT_VARIANTS
 
 logger = get_logger("auto_selfie.scene")
 
@@ -28,66 +28,66 @@ logger = get_logger("auto_selfie.scene")
 
 # 活动类型到动作的映射（每种类型多个变体）
 ACTIVITY_ACTIONS: Dict[str, List[str]] = {
-    "sleeping": ["lying down, hugging pillow, cozy", "curled up, soft blanket, peaceful", "resting head on pillow, sleepy"],
-    "waking_up": ["stretching, yawning, messy hair", "rubbing eyes, drowsy, morning light", "sitting on bed, stretching arms"],
-    "eating": ["holding chopsticks, eating", "sipping drink, enjoying meal", "taking a bite, happy expression"],
-    "working": ["typing on laptop, focused", "reading screen, concentrated", "resting chin on hand, thoughtful"],
-    "studying": ["holding book, reading", "taking notes, focused", "highlighting text, engaged"],
-    "exercising": ["stretching, athletic, holding water bottle", "warming up, energetic", "cooling down, relaxed posture"],
-    "relaxing": ["lying on couch, relaxed, listening to music", "curled up with blanket", "sitting comfortably, legs crossed"],
-    "socializing": ["making peace sign, happy, laughing", "waving hand, cheerful", "hands clasped, excited smile"],
-    "commuting": ["holding bag, walking, wearing earbuds", "standing, holding strap", "waiting, looking around"],
-    "hobby": ["holding camera, creative", "focused on craft, concentrated", "holding tools, engaged"],
-    "self_care": ["applying makeup, mirror", "skincare routine, gentle", "fixing hair, mirror reflection"],
-    "other": ["standing, casual pose, natural", "relaxed stance, comfortable", "leaning slightly, easy-going"],
+    "sleeping": ["侧躺抱枕，蜷缩慵懒", "裹紧毛毯，安静入眠", "枕着手臂睡着，安详表情"],
+    "waking_up": ["伸懒腰打哈欠，发型微乱", "揉眼睛半睁，刚醒神态", "坐在床上伸展双臂"],
+    "eating": ["手持筷子夹菜", "端起杯子轻抿", "咬一口食物，满足表情"],
+    "working": ["敲击键盘，专注神情", "盯着屏幕，若有所思", "托腮思考，眼神专注"],
+    "studying": ["手持书本阅读", "提笔做笔记，认真", "手指划过书页，专注"],
+    "exercising": ["拉伸热身，精力充沛，手持水瓶", "做准备活动，充满活力", "放松冷却，姿态舒缓"],
+    "relaxing": ["窝在沙发上听音乐，慵懒", "蜷缩进毛毯里", "舒适地盘腿而坐"],
+    "socializing": ["比V字手势欢笑", "挥手打招呼，开心", "双手交握，兴奋微笑"],
+    "commuting": ["手提包，戴耳机漫步", "站立抓住扶手", "等待，四处张望"],
+    "hobby": ["手持相机，创意十足", "专注手工，神情投入", "手持道具，全神贯注"],
+    "self_care": ["对着镜子化妆", "护肤中，轻柔动作", "整理发型，看着镜子"],
+    "other": ["站立自然姿势", "轻松站姿，舒适", "微微侧身，随性"],
 }
 
 # 活动类型到场景环境的映射（多样变体）
 ACTIVITY_ENVIRONMENTS: Dict[str, List[str]] = {
-    "sleeping": ["bedroom, dim lighting, cozy atmosphere, bed", "soft pillows, warm blankets", "quiet room, night ambience"],
-    "waking_up": ["bedroom, morning light, curtains, warm sunlight", "window light, soft glow", "dawn atmosphere, gentle rays"],
-    "eating": ["dining room, table setting", "cozy cafe, warm interior", "kitchen counter, casual meal"],
-    "working": ["office desk, computer screen", "study room, clean setup", "workspace, minimal background"],
-    "studying": ["library, bookshelves, desk lamp", "study desk, warm lamp", "quiet corner, books around"],
-    "exercising": ["gym, fitness equipment", "home workout space", "outdoor park, green background"],
-    "relaxing": ["living room, sofa, afternoon sun", "cozy corner, soft cushions", "balcony, city view"],
-    "socializing": ["outdoor cafe, bright atmosphere", "restaurant, warm lighting", "park bench, natural scenery"],
-    "commuting": ["city street, urban", "subway platform, soft light", "bus stop, morning scene"],
-    "hobby": ["art studio, creative space", "workshop, organized chaos", "creative corner, inspiring"],
-    "self_care": ["bathroom, mirror, vanity", "dressing table, soft light", "vanity area, clean aesthetic"],
-    "other": ["indoor, natural lighting", "casual setting, soft focus", "neutral background, clean"],
+    "sleeping": ["卧室，暖色夜灯，温馨氛围", "柔软枕头，暖色毛毯", "安静房间，夜晚氛围"],
+    "waking_up": ["卧室，清晨阳光，窗帘半开", "窗前，柔和晨光", "晨曦氛围，光线轻柔"],
+    "eating": ["餐厅，桌上摆好餐具", "温馨咖啡厅，暖色内饰", "厨房吧台，随性用餐"],
+    "working": ["办公桌，屏幕背光", "书房，整洁布置", "工作台，干净背景"],
+    "studying": ["图书馆，书架，台灯", "书桌，暖色台灯", "安静角落，书籍环绕"],
+    "exercising": ["健身房，器械背景", "家中运动区", "户外公园，绿色背景"],
+    "relaxing": ["客厅，沙发，午后阳光", "温馨角落，软垫", "阳台，城市远景"],
+    "socializing": ["户外咖啡厅，明亮氛围", "餐厅，暖色灯光", "公园长椅，自然风景"],
+    "commuting": ["城市街道，都市感", "地铁站台，柔和光线", "公交站，清晨场景"],
+    "hobby": ["艺术工作室，创意空间", "工坊，有序陈列", "创意角落，充满灵感"],
+    "self_care": ["浴室，镜子，梳妆台", "梳妆台，柔和灯光", "化妆区，清洁美感"],
+    "other": ["室内，自然采光", "随性场景，柔和虚化", "中性背景，干净简洁"],
 }
 
 # 活动类型到表情的映射（多样变体）
 ACTIVITY_EXPRESSIONS: Dict[str, List[str]] = {
-    "sleeping": ["peaceful expression, closed eyes", "serene, restful", "content smile, dreaming"],
-    "waking_up": ["drowsy expression, half-open eyes", "sleepy smile, gentle", "soft expression, waking slowly"],
-    "eating": ["happy expression, enjoying food", "content smile, satisfied", "delighted, savoring"],
-    "working": ["focused expression, serious", "concentrated, thoughtful", "determined, engaged"],
-    "studying": ["focused, thoughtful expression", "absorbed, curious", "intent, learning"],
-    "exercising": ["energetic expression, determined", "bright smile, motivated", "healthy glow, active"],
-    "relaxing": ["relaxed smile, content", "peaceful, at ease", "gentle expression, comfortable"],
-    "socializing": ["bright smile, happy", "laughing, joyful", "warm expression, friendly"],
-    "commuting": ["calm expression", "peaceful, contemplative", "relaxed, observing"],
-    "hobby": ["excited, passionate", "enthusiastic, engaged", "bright eyes, inspired"],
-    "self_care": ["gentle smile, self-care", "serene, pampered", "soft expression, relaxed"],
-    "other": ["natural smile", "warm expression", "pleasant, approachable"],
+    "sleeping": ["安详表情，眼睛闭合", "宁静，安睡中", "满足的微笑，梦境中"],
+    "waking_up": ["迷糊表情，眼睛半开", "睡眼惺忪，淡淡微笑", "柔和表情，刚刚醒来"],
+    "eating": ["开心表情，享受美食", "满足微笑", "愉快，细细品味"],
+    "working": ["专注表情，神情认真", "若有所思，眼神投入", "坚定，全情投入"],
+    "studying": ["专注，若有所思", "沉浸其中，好奇", "认真，求知若渴"],
+    "exercising": ["充满活力，坚定", "灿烂笑容，斗志昂扬", "健康光泽，运动感"],
+    "relaxing": ["放松微笑，惬意", "平静，舒适自在", "温柔表情，舒缓"],
+    "socializing": ["灿烂微笑，开心", "大笑，喜悦", "温暖表情，友善"],
+    "commuting": ["平静表情", "宁静，若有所思", "放松，环顾四周"],
+    "hobby": ["兴奋，充满热情", "投入，全神贯注", "眼神发光，充满灵感"],
+    "self_care": ["温柔微笑，美好时光", "宁静，宠爱自己", "柔和表情，放松"],
+    "other": ["自然微笑", "温柔表情", "亲切随和"],
 }
 
 # 活动类型到光线的映射（多样变体）
 ACTIVITY_LIGHTING: Dict[str, List[str]] = {
-    "sleeping": ["dim warm light, night lamp", "soft ambient glow", "moonlight, gentle shadows"],
-    "waking_up": ["soft morning light, golden hour", "warm sunrise, gentle rays", "dawn light, soft diffusion"],
-    "eating": ["warm indoor lighting", "soft overhead light", "candlelight, cozy"],
-    "working": ["office lighting, even illumination", "desk lamp, focused light", "natural window light"],
-    "studying": ["desk lamp, focused light", "warm study lamp", "soft reading light"],
-    "exercising": ["bright natural light", "gym lighting, energetic", "outdoor sunshine, dynamic"],
-    "relaxing": ["soft afternoon light, warm ambient light", "golden hour, cozy", "dappled light, peaceful"],
-    "socializing": ["bright cheerful lighting", "warm cafe lights", "natural daylight, lively"],
-    "commuting": ["morning sunlight", "soft urban light", "overcast, diffused"],
-    "hobby": ["creative studio lighting", "natural light, inspiring", "warm lamp, focused"],
-    "self_care": ["bathroom lighting, mirror reflection", "vanity lights, soft", "natural mirror light"],
-    "other": ["natural lighting", "soft diffused light", "balanced illumination"],
+    "sleeping": ["暖色夜灯，昏黄", "柔和环境光", "月光，淡淡阴影"],
+    "waking_up": ["柔和晨光，金色时刻", "温暖日出，轻柔光线", "黎明光线，柔和漫射"],
+    "eating": ["暖色室内灯光", "柔和顶灯", "烛光，温馨"],
+    "working": ["办公灯光，均匀照明", "台灯，集中光线", "窗边自然光"],
+    "studying": ["台灯，聚焦光线", "暖色学习灯", "柔和阅读光"],
+    "exercising": ["明亮自然光", "健身房灯光，充满活力", "户外阳光，动感"],
+    "relaxing": ["柔和午后光线，暖色环境光", "黄金时刻，温馨", "斑驳光影，安静"],
+    "socializing": ["明亮欢快灯光", "暖色咖啡厅灯", "自然日光，生动"],
+    "commuting": ["清晨阳光", "柔和都市光线", "阴天，漫射光"],
+    "hobby": ["创意工作室灯光", "自然光，充满灵感", "暖色台灯，聚焦"],
+    "self_care": ["浴室灯光，镜面反射", "梳妆台灯，柔和", "自然镜前光"],
+    "other": ["自然采光", "柔和漫射光", "均衡照明"],
 }
 
 
@@ -342,86 +342,47 @@ async def convert_to_selfie_prompt(
     bot_appearance: str = "",
 ) -> Optional[str]:
     """
-    将活动信息转换为完整的自拍 SD 提示词（自动自拍专用）
+    将活动信息转换为完整的自拍提示词（自动自拍专用）
 
-    使用 LLM 根据活动描述生成场景标签，LLM 失败时返回 None。
+    非 cosplay 模式：直接从 SELFIE_OUTFIT_VARIANTS 中选取完整中文描述模板，
+    追加活动描述作为情境补充，不再调用 LLM 生成场景。
+    cosplay 模式：保持原有英文 SD tag 逻辑，LLM 场景生成失败时返回 None。
 
     Args:
         activity_info: 活动信息
-        selfie_style: 自拍风格 ("standard"、"mirror" 或 "photo")
-        bot_appearance: Bot 外观描述（从配置读取的 selfie.prompt_prefix）
+        selfie_style: 自拍风格 ("standard"、"mirror"、"photo" 或 "cosplay")
+        bot_appearance: Bot 外观描述（从配置读取的 selfie.prompt_prefix，非 cosplay 时忽略）
 
     Returns:
-        完整的 SD 提示词，LLM 失败时返回 None
+        完整提示词，异常时返回 None
     """
-    # 使用 LLM 生成场景（传入风格以约束动作类型）
-    scene = await generate_scene_with_llm(activity_info, selfie_style)
-    if not scene:
-        logger.warning("LLM 场景生成失败，取消本次自拍提示词生成")
-        return None
+    # cosplay 模式：直接使用完整中文角色描述模板
+    if selfie_style == "cosplay":
+        from ..pic_action import MaisArtAction
+        prompt = random.choice(MaisArtAction._COSPLAY_CHARACTERS)
+        if activity_info and activity_info.description:
+            prompt += f"，她刚{activity_info.description}回来"
+        logger.info(f"生成 cosplay 自拍提示词: {prompt[:150]}...")
+        return prompt
 
-    prompt_parts: List[str] = []
+    # 非 cosplay 模式：完整中文模板 + 活动情境追加
+    prompt = random.choice(SELFIE_OUTFIT_VARIANTS)
 
-    # 1. 强制主体（含手部质量引导）
-    prompt_parts.append("(1girl:1.4), (solo:1.3), (perfect hands:1.2), (correct anatomy:1.1)")
+    # 按风格追加修饰
+    style_suffix = {
+        "mirror": "，对着镜子自拍，手机镜头可见，镜中映出倒影",
+        "photo": "，由旁人拍摄，构图自然，全身或半身入镜",
+    }
+    suffix = style_suffix.get(selfie_style, "")
+    if suffix:
+        prompt = prompt + suffix
 
-    # 2. Bot 外观
-    if bot_appearance:
-        prompt_parts.append(bot_appearance)
+    # 追加活动描述作为情境补充
+    if activity_info and activity_info.description:
+        prompt = prompt + f"，她刚{activity_info.description}回来"
 
-    # 2.5 服装：非 cosplay 时随机 JK、lolita 等少女穿搭
-    if selfie_style != "cosplay":
-        prompt_parts.append(random.choice(SELFIE_OUTFIT_VARIANTS))
-
-    # 3. 表情
-    prompt_parts.append(f"({scene['expression']}:1.2)")
-
-    # 4. 手部/身体动作
-    hand_action = scene["hand_action"]
-
-    # standard 自拍禁止手机类词汇
-    if selfie_style == "standard" and hand_action:
-        if re.search(r"\b(phone|smartphone|mobile|device)\b", hand_action, flags=re.IGNORECASE):
-            hand_action = "resting head on hand"
-
-    if hand_action:
-        if selfie_style == "standard":
-            hand_prompt = (
-                f"(visible free hand {hand_action}:1.4), "
-                "(only one hand visible in frame:1.5), "
-                "(single hand gesture:1.3)"
-            )
-        elif selfie_style == "photo":
-            # 第三人称照片：自然动作，不需要手部强调
-            hand_prompt = f"({hand_action}:1.2)"
-        else:
-            hand_prompt = f"({hand_action}:1.3)"
-        prompt_parts.append(hand_prompt)
-
-    # 5. 环境
-    prompt_parts.append(scene["environment"])
-
-    # 6. 光线
-    prompt_parts.append(scene["lighting"])
-
-    # 7. 自拍风格（多种变体随机，增加多样性）
-    selfie_scenes = _get_selfie_scene_for_style(selfie_style)
-    prompt_parts.append(random.choice(selfie_scenes))
-
-    # 8. 过滤空值、去重、拼接
-    prompt_parts = [p for p in prompt_parts if p and p.strip()]
-    keywords = [kw.strip() for kw in ", ".join(prompt_parts).split(",")]
-    seen = set()
-    unique = []
-    for kw in keywords:
-        kw_lower = kw.strip().lower()
-        if kw_lower and kw_lower not in seen:
-            seen.add(kw_lower)
-            unique.append(kw.strip())
-
-    final_prompt = ", ".join(unique)
-    logger.info(f"生成自拍提示词: {final_prompt[:150]}...")
-    return final_prompt
+    logger.info(f"生成自拍提示词: {prompt[:150]}...")
+    return prompt
 
 
 def get_negative_prompt_for_style(selfie_style: str, base_negative: str = "") -> str:
@@ -439,15 +400,6 @@ def get_negative_prompt_for_style(selfie_style: str, base_negative: str = "") ->
     if base_negative:
         parts.append(base_negative)
 
-    # 所有风格都加手部质量负面提示词
     parts.append(SELFIE_HAND_NEGATIVE)
-
-    # 非 cosplay 时加服装负面（避免大妈感、老气穿搭）
-    if selfie_style != "cosplay":
-        parts.append(SELFIE_OUTFIT_NEGATIVE)
-
-    # standard 额外加防双手拿手机，cosplay 不加（角色姿势可双手自由）
-    if selfie_style == "standard":
-        parts.append(ANTI_DUAL_PHONE_PROMPT)
 
     return ", ".join(parts)

@@ -6,44 +6,59 @@ BASE64_IMAGE_PREFIXES = ("iVBORw", "/9j/", "UklGR", "R0lGOD")
 
 # 自拍通用手部质量负面提示词（所有自拍风格共用）
 SELFIE_HAND_NEGATIVE = (
-    "extra fingers, missing fingers, fused fingers, too many fingers, "
-    "mutated hands, malformed hands, bad hands, wrong hands, "
-    "extra hands, extra arms, 3 hands, 4 hands, multiple hands, "
-    "deformed fingers, interlocked fingers, twisted fingers, "
-    "six fingers, more than 5 fingers, fewer than 5 fingers, "
-    "extra digit, missing digit, bad anatomy"
+    "手指变形，手指缺失，手指融合，手指过多，手指扭曲，"
+    "手部变形，手部错误，多余的手，三只手，四只手，多只手，"
+    "六根手指，五根以上手指，少于五根手指，解剖结构错误"
 )
 
 # 标准自拍专用：防止生成双手拿手机等不自然姿态
 ANTI_DUAL_PHONE_PROMPT = (
-    "two phones, camera in both hands, "
-    "holding phone with both hands, "
-    "both hands holding phone, "
-    "phone in frame, visible phone in hand, "
-    "both hands visible"
+    "双手持手机，两只手都拿手机，双手都可见，画面中可见手机"
 )
 
 # 向后兼容别名
-ANTI_DUAL_HANDS_PROMPT = f"{SELFIE_HAND_NEGATIVE}, {ANTI_DUAL_PHONE_PROMPT}"
+ANTI_DUAL_HANDS_PROMPT = f"{SELFIE_HAND_NEGATIVE}，{ANTI_DUAL_PHONE_PROMPT}"
 
-# 自拍服装与形象：JK、lolita 等少女穿搭随机（standard/mirror/photo 非 cosplay 时使用）
-# 发型：波波头或双马尾，齐刘海，黄发，柔和表情
-_APPEARANCE_BOB = "young East Asian woman, bob haircut, straight bangs, yellow blonde hair, soft gentle expression"
-_APPEARANCE_TWINTAILS = "young East Asian woman, twin tails, straight bangs, yellow blonde hair, soft gentle expression"
-_OUTFITS = (
-    "Japanese sailor-style school uniform, white blouse with navy sailor collar and red ribbon, gray pleated skirt, black knee-high socks",
-    "Japanese blazer school uniform, white shirt, red ribbon tie, pleated skirt, black knee-high socks, loafers",
-    "sweet lolita dress, frilly skirt, lace collar, bow, petticoat, knee-high socks, Mary Jane shoes",
-    "classic lolita dress, lace details, ribbon, puff sleeves, elegant skirt, knee-high socks",
-    "casual kawaii outfit, oversized sweater, pleated skirt, knee-high socks, cute accessories",
-    "cardigan over white blouse, plaid pleated skirt, knee-high socks, soft feminine style",
+# 自拍服装与形象：直接使用高质量中文摄影提示词模板（standard/mirror/photo 非 cosplay 时使用）
+# 发型统一设定：齐刘海，金色，波波头或双马尾；姿势擦边大胆，内裤而非打底裤
+
+SELFIE_OUTFIT_VARIANTS = (
+    # 模板1：黑色亮面Cosplay礼帽 × 复古酒吧 - 暗黑性感
+    "一幅极具细节的超高清摄影作品，画面中心是一位年轻可爱的亚洲女性，正在进行精美的动漫角色扮演。她留着齐刘海的金色波波头。"
+    "她有着明亮清澈的蓝色眼眸，化着精致的二次元妆容，表情俏皮可爱，嘴角带着一抹淡淡的微笑。"
+    "她的服装设计独特且充满光泽感：头戴一顶黑色亮面礼帽，帽子上带有蓝色丝带装饰。"
+    "上半身穿着一件黑色亮面超短长袖外套，领口处系着一个巨大的蓝色蝴蝶结。"
+    "外套内部是一件透明PVC塑料材质紧身抹胸，通过细黑色绑带固定在躯干上，光线在透明材质上形成强烈高光反射。"
+    "她坐在深色木质复古吧台高脚凳上，右腿高高抬起横搭在吧台边缘，半透明黑色丝袜与腿环在强光下清晰可见，"
+    "左手从大腿内侧向上撩起黑色超短裙一角，黑色蕾丝内裤的边缘完整地露出，右手轻捏帽檐，眼神妩媚直视镜头。"
+    "背景设定在古典复古木质酒吧内，深色实木吧台，洋酒瓶与玻璃高脚杯错落有致。"
+    "顶部逆光与轮廓光打在帽子、头发和肩膀上，亮面材质高光极为丰富，电影级光影，背景浅景深，8K超清。",
+
+    # 模板2：粉白华丽Lolita双马尾 × 浅紫梦幻房间 - 甜美性感
+    "一幅极具细节的高清摄影杰作。画面中是一位年轻的亚洲女性，正在进行动漫角色扮演。她留着齐刘海的金色双马尾，头戴白色蝴蝶结发饰。"
+    "她身穿粉白相间的华丽超短吊带裙，裙摆带有大量层层叠叠的蕾丝褶皱。"
+    "她跪坐在华丽的白色复古皮质沙发上，双腿大幅分开，蕾丝裙摆完全散开，"
+    "一手撩起裙摆一角，粉色蕾丝内裤正面完整入镜，另一手向前伸向镜头，回眸对镜头露出甜美撩人的微笑。"
+    "双腿穿着白色过膝长筒袜，左侧大腿上绑着带有蝴蝶结的白色腿环，丝袜顶端花边若隐若现。"
+    "背景是柔和的浅紫色梦幻房间。整体光线柔和明亮，具有梦幻的二次元氛围。8k分辨率，电影级光影。",
+
+    # 模板3：黑金猫女高叉连体衣 × 蓝白布幔 - 妩媚性感
+    "一幅动漫风格的Cosplay高清摄影杰作。画面中是一位年轻亚洲女性，留着齐刘海的金色双马尾，头戴白色猫耳，蓝色眼眸。"
+    "她身穿黑金相间亮面高叉连体紧身衣，高叉开口直至腰侧，腹部镂空设计，颈部佩戴黑色项圈，手臂配金色臂环。"
+    "她坐在低矮皮质沙发边缘，双腿向两侧大幅叉开，高叉处完全敞开，"
+    "一手从大腿内侧缓缓向上滑过，另一手撑在沙发上，连体衣胯部布料贴身，黑色内裤轮廓清晰可见，"
+    "眼神慵懒而极度妩媚地直视镜头，嘴唇微启。"
+    "背景布置有蓝白相间垂坠布幔与复古木质框架。强烈侧边光影突出肌肤与服饰亮面质感，8k分辨率，电影级光影，极致细节。",
+
+    # 模板4：马卡龙兔女郎蕾丝套装 × 温馨室内 - 甜美俏皮
+    "一幅极具细节的高清日系人像摄影杰作。画面中心是一位年轻可爱的亚洲女性，正在进行精美的兔女郎动漫角色扮演。"
+    "她留着齐刘海的金色短发，两侧扎着小巧的双马尾，头顶戴着一对巨大的白色毛绒兔耳。"
+    "她有着明亮的蓝色眼眸，化着精致甜美的二次元妆容，脸颊带有粉嫩的晕染腮红。"
+    "她的服装是马卡龙浅蓝色与浅粉色相间蕾丝套装：复杂白色蕾丝花边胸衣，蕾丝颈圈系蓝色蝴蝶结，蕾丝袖套，腰间半解开的蕾丝迷你围裙，以及同款浅蓝色蕾丝内裤。"
+    "她坐在梳妆台凳子上，双腿向两侧大幅叉开，蕾丝围裙完全散开两侧，浅蓝色蕾丝内裤正面完整入镜，"
+    "右手食指轻触微启的双唇，左手撩起围裙一角，眼神迷离含情，表情俏皮撩人。"
+    "背景是明亮温馨的室内房间，白墙悬挂水彩画，干花点缀，白色窗帘。高调明亮光线，梦幻柔光效果，极度甜美二次元氛围。",
 )
-# 6 套服装 × 2 种发型 = 12 种组合随机
-SELFIE_OUTFIT_VARIANTS = tuple(
-    f"{app}, {outfit}" for app in (_APPEARANCE_BOB, _APPEARANCE_TWINTAILS) for outfit in _OUTFITS
-)
-SELFIE_OUTFIT_NEGATIVE = (
-    "mature outfit, old-fashioned clothing, middle-aged style, "
-    "frumpy, matronly, dowdy, grandmother clothes, "
-    "formal business suit, conservative dress, elderly fashion"
-)
+
+# 不过滤 NSFW 内容
+SELFIE_OUTFIT_NEGATIVE = ""
