@@ -378,6 +378,45 @@ class MaisArtAction(BaseAction):
             logger.info(f"{self.log_prefix} 未检测到输入图片，使用文生图模式")
             return await self._execute_unified_generation(description, model_id, size, None, None, extra_negative_prompt=extra_neg)
 
+    # 审核拒绝检测关键字
+    _AUDIT_ERROR_KEYWORDS = ("RHAuditException", "audit.RH", "Porn", "porn", "色情审核")
+
+    # 触发审核的最露骨词句（正则模式列表）
+    _AUDIT_EXPLICIT_PATTERNS = [
+        r"内裤[^，。]*(?:正面|完整|清晰|边缘)[^，。]*入镜",
+        r"内裤[^，。]*入镜",
+        r"内裤[^，。]*露出",
+        r"内裤轮廓清晰可见",
+        r"内裤",
+        r"双腿[^，。]*大幅[^，。]*叉开",
+        r"双腿[^，。]*大幅[^，。]*分开[^，。]*朝向镜头",
+        r"大腿内侧[^，。]*完整[^，。]*(?:入镜|暴露|裸露)",
+        r"裸腿与[^，。]*完整暴露",
+        r"裙摆[^，。]*完全翻(?:起|开)",
+        r"裙摆[^，。]*完全散开[^，。]*撩起",
+        r"完整裸露",
+        r"正面完整入镜",
+        r"胯部[^，。]*布料贴身",
+        r"覆盖面极小",
+        r"几乎毫无遮挡",
+        r"皮肤质感细腻通透，电影级光影，8K超清",  # 比基尼模板末尾
+    ]
+
+    @classmethod
+    def _is_audit_rejection(cls, error_str: str) -> bool:
+        return any(kw in error_str for kw in cls._AUDIT_ERROR_KEYWORDS)
+
+    @classmethod
+    def _sanitize_for_audit(cls, prompt: str) -> str:
+        """去除触发审核的最露骨词句，保留整体风格描述"""
+        import re
+        result = prompt
+        for pattern in cls._AUDIT_EXPLICIT_PATTERNS:
+            result = re.sub(pattern, "", result)
+        result = re.sub(r"[，,]{2,}", "，", result)
+        result = re.sub(r"^[，,\s]+|[，,\s]+$", "", result)
+        return result
+
     async def _execute_unified_generation(self, description: str, model_id: str, size: str, strength: float = None, input_image_base64: str = None, extra_negative_prompt: Optional[str] = None) -> Tuple[bool, Optional[str]]:
         """统一的图片生成执行方法
 
@@ -484,6 +523,26 @@ class MaisArtAction(BaseAction):
             traceback.print_exc()
             success = False
             result = f"图片生成服务遇到意外问题: {str(e)[:100]}"
+
+        # 审核拒绝时：降级提示词，静默重试一次
+        if not success and self._is_audit_rejection(str(result)):
+            fallback_prompt = self._sanitize_for_audit(description)
+            if fallback_prompt and fallback_prompt != description:
+                logger.warning(f"{self.log_prefix} 审核拒绝，降级提示词后重试一次")
+                try:
+                    success, result = await api_client.generate_image(
+                        prompt=fallback_prompt,
+                        model_config=model_config,
+                        size=image_size,
+                        strength=strength,
+                        input_image_base64=input_image_base64,
+                        max_retries=1,
+                    )
+                    if success:
+                        description = fallback_prompt  # 用于缓存key
+                except Exception as _e:
+                    success = False
+                    result = f"降级重试失败: {str(_e)[:80]}"
 
         if success:
             final_image_data = self.image_processor.process_api_response(result)
