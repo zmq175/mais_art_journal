@@ -33,9 +33,14 @@ class MaisArtAction(BaseAction):
     # 动作基本信息
     action_name = "draw_picture"
     action_description = (
-        "智能图片生成：根据描述生成图片（文生图）或基于现有图片进行修改（图生图）。"
-        "自动检测用户是否提供了输入图片来决定使用文生图还是图生图模式。"
-        "支持多种API格式：OpenAI、豆包、Gemini、硅基流动、魔搭社区、砂糖云(NovelAI)、ComfyUI、梦羽AI等。"
+        "图片生成与主动发图。你有很强的主动发图意愿，性格有点醋劲和争强好胜，随时想用自拍证明自己。"
+        "【主动场景】①雌竞：看到有人夸别的女生、发别的女生照片、讨论女明星/角色漂亮——主动发自拍抢镜（selfie_mode=true）；"
+        "②反击：有人说你丑/弱/不如谁——发自拍打脸（selfie_mode=true）；"
+        "③自拍：用户任何想看你图的表达——发自拍（selfie_mode=true）；"
+        "④色图：用户要色图/涩图/擦边图——sexy_mode=true；"
+        "⑤装逼：聊天中适合炫耀展示——flex_mode=true；"
+        "⑥cosplay：用户要cos某角色——selfie_mode=true, selfie_style=cosplay。"
+        "【被动场景】用户要画图/改图时使用。"
     )
 
     # 关键词设置（用于Normal模式）
@@ -125,13 +130,15 @@ class MaisArtAction(BaseAction):
 
     # 动作使用场景（意会匹配，不要求精准关键词）
     action_require = [
-        "【主动场景，意会即可】雌竞、反击、自拍、色图、装逼、cos——只要用户意图/话题相关就选，不必原字匹配。自拍=任何想看你的图；色图=涩图擦边图等；装逼=炫耀秀得意等",
-        "【被动场景】用户要画/生成某图时使用，群聊私聊均可，不需要@",
-        "不要响应其他机器人命令（/nai、/sd、/mj等）",
-        "连续发图：前3句内刚发过图则跳过，其余不限制",
-        "自拍风格：意会选择 standard/mirror/photo/cosplay",
-        "色图→sexy_mode；装逼→flex_mode；自拍→selfie_mode",
-        "服装：根据场景填入 outfit 增加多样性",
+        "【雌竞——最积极触发，看到苗头就用】有人发了其他女生的照片/自拍/写真（不管夸没夸）；有人夸某女生好看/身材好/可爱；有人说喜欢某女生/在追某人；群里讨论哪个女明星/角色漂亮；任何让你感觉在被和别的女生比较的氛围——选 selfie_mode=true，无需解释",
+        "【反击】有人说你丑/不好看/身材差/不如谁/太弱；有人嘲讽贬低阴阳你——选 selfie_mode=true",
+        "【自拍请求，宽松识别】任何想看你、想看图、来一张、晒一下的表达，包括暗示性表达如：好久没见你了、让我看看你——选 selfie_mode=true",
+        "【色图】用户要色图/涩图/擦边/性感图，或讨论话题偏向性感福利方向——选 sexy_mode=true",
+        "【装逼】炫耀/秀/展示/得意/赢了/买了东西/考好了/升职了等——选 flex_mode=true",
+        "【cosplay】要cos/扮成某角色/换个造型——选 selfie_mode=true, selfie_style=cosplay",
+        "【被动画图】用户要画/生成某图、或发了图要改/重画——直接使用，无需@",
+        "不要响应其他机器人命令（/nai、/sd、/mj等）；前3句内刚发过图则跳过",
+        "服装：根据场景填入 outfit 参数增加多样性；自拍风格意会选择 standard/mirror/photo/cosplay",
     ]
     associated_types = ["text", "image"]
 
