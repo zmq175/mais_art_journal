@@ -116,7 +116,7 @@ class MaisArtAction(BaseAction):
 
     # 动作参数定义（简化版，提示词优化由独立模块处理）
     action_parameters = {
-        "description": "从用户消息中提取的图片描述文本（例如：用户说'画一只小猫'，则填写'一只小猫'）。必填参数。",
+        "description": "图片描述文本。【被动画图时】从用户消息中提取，如用户说'画一只小猫'则填'一只小猫'。【主动场景（selfie_mode/sexy_mode/flex_mode=true）时可以留空或不填】——自拍/色图/装逼模式会自动生成提示词，不需要从用户消息中强行提取描述。",
         "model_id": "要使用的模型ID（如model1、model2、model3等，默认使用default_model配置的模型）",
         "strength": "图生图强度，0.1-1.0之间，值越高变化越大（仅图生图时使用，可选，默认0.7）",
         "size": "图片尺寸，如512x512、1024x1024等（可选，不指定则使用模型默认尺寸）",
@@ -139,6 +139,7 @@ class MaisArtAction(BaseAction):
         "【被动画图】用户要画/生成某图、或发了图要改/重画——直接使用，无需@",
         "不要响应其他机器人命令（/nai、/sd、/mj等）；前3句内刚发过图则跳过",
         "服装：根据场景填入 outfit 参数增加多样性；自拍风格意会选择 standard/mirror/photo/cosplay",
+        "重要：selfie_mode/sexy_mode/flex_mode=true 时，description 可以留空或不填，系统会自动生成提示词；不要为了填满 description 而乱编描述",
     ]
     associated_types = ["text", "image"]
 
@@ -220,20 +221,19 @@ class MaisArtAction(BaseAction):
             await self.send_text(f"模型 {model_id} 当前不可用")
             return False, f"模型 {model_id} 已禁用"
 
-        # 参数验证和后备提取（色图/装逼模式也需要描述用于组合提示词）
-        if not description and not flex_mode:
+        # 参数验证和后备提取
+        # selfie/sexy/flex 模式不依赖 description，不需要强制要求
+        need_description = not selfie_mode and not sexy_mode and not flex_mode
+        if not description and need_description:
             # 尝试从action_message中提取描述
             extracted_description = self._extract_description_from_message()
             if extracted_description:
                 description = extracted_description
                 logger.info(f"{self.log_prefix} 从消息中提取到图片描述: {description}")
             else:
-                if flex_mode:
-                    description = "装逼配图"
-                else:
-                    logger.warning(f"{self.log_prefix} 图片描述为空，无法生成图片。")
-                    await self.send_text("你需要告诉我想要画什么样的图片哦~ 比如说'画一只可爱的小猫'")
-                    return False, "图片描述为空"
+                logger.warning(f"{self.log_prefix} 图片描述为空，无法生成图片。")
+                await self.send_text("你需要告诉我想要画什么样的图片哦~ 比如说'画一只可爱的小猫'")
+                return False, "图片描述为空"
 
         # 清理和验证描述
         if len(description) > 1000:
